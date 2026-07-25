@@ -277,9 +277,9 @@ const D={
  valuesSub:['كل عيلة ليها طريقتها — والقرار دايمًا ليكم.','لكل عائلة طريقتها — والقرار دائمًا لكم.','Every family has its own way — the choice is always yours.'],
  religious:['المحتوى الديني','المحتوى الديني','Religious content'],
  religiousSub:['مهام الصلاة والقرآن وقصصها — اختياري بالكامل','مهام الصلاة والقرآن وقصصها — اختياري بالكامل','Prayer, Quran tasks and their stories — fully optional'],
- periodL:['فترة التقييم','فترة التقييم','Evaluation period'],
- periodSub:['بنرشح الأسبوعية — نتيجة كل أسبوع تروح للمحفظة','نرشّح الأسبوعية — نتيجة كل أسبوع تنتقل للمحفظة','We recommend weekly — each week’s result goes to the wallet'],
- daily:['يومية','يومية','Daily'], weekly:['أسبوعية','أسبوعية','Weekly'], monthly:['شهرية','شهرية','Monthly'],
+ periodL:['نحسب النقاط كل قد إيه؟','متى نحسب النقاط؟','When do we count the points?'],
+ periodSub:['يعني إمتى نقفل الحساب ونحوّل النقاط للمحفظة ونمنح البونص. بنرشح كل أسبوع.','أي متى نغلق الحساب وننقل النقاط إلى المحفظة ونمنح المكافأة. نرشّح كل أسبوع.','That is when we close the tally, move points to the wallet and grant the bonus. Weekly is our pick.'],
+ daily:['كل يوم','كل يوم','Every day'], weekly:['كل أسبوع','كل أسبوع','Every week'], monthly:['كل شهر','كل شهر','Every month'],
  parentPinL:['رقم سري لواجهة بابا وماما','رقم سري لواجهة ولي الأمر','PIN for the parent area'],
  parentPinSub:['عشان الأطفال ما يدخلوش يعتمدوا لنفسهم 😉','حتى لا يعتمد الأطفال لأنفسهم 😉','So kids can’t approve for themselves 😉'],
  tasksFor:['مهام {0}','مهام {0}','{0}’s tasks'],
@@ -293,7 +293,7 @@ const D={
  icon:['الأيقونة','الأيقونة','Icon'],
  points:['النقاط','النقاط','Points'],
  repeat:['التكرار','التكرار','Repeat'],
- possibleWeek:['مجموع النقاط الممكنة في الفترة: {0}','مجموع النقاط الممكنة في الفترة: {0}','Total points possible this period: {0}'],
+ possibleWeek:['أقصى نقاط ممكنة في {1}: {0}','أقصى نقاط ممكنة في {1}: {0}','Most points possible per {1}: {0}'],
  rwTitle:['المكافآت اللي مستعدين تقدموها','المكافآت التي تودّون تقديمها','Rewards you’re willing to offer'],
  rwSub:['دي اقتراحات بس — اختار اللي يناسب عيلتك، عدّل السعر، أو ضيف مكافأة من عندك. التطبيق مش هيوعد الأطفال بأي حاجة انت ما اخترتهاش.','هذه اقتراحات فقط — اختر ما يناسب عائلتك، عدّل التكلفة، أو أضف مكافأة خاصة. لن يَعِد التطبيق الأطفال بأي شيء لم تختره.','These are only suggestions — pick what suits your family, adjust the cost, or add your own. The app promises the kids nothing you didn’t choose.'],
  rwChosen:['اخترت {0} مكافآت','اخترت {0} مكافآت','{0} rewards selected'],
@@ -303,7 +303,7 @@ const D={
  cost:['التكلفة بالنقاط','التكلفة بالنقاط','Cost in points'],
  targetTitle:['الهدف والبونص','الهدف والمكافأة الإضافية','Target & bonus'],
  targetSub:['اقترحنا هدف كل طفل = ٧٥٪ من نقاطه الممكنة — عدّله براحتك. اللي يحقق هدفه ياخد بونص.','اقترحنا هدف كل طفل = ٧٥٪ من نقاطه الممكنة — عدّله كما تشاء. من يحقق هدفه ينال مكافأة إضافية.','We suggest each child’s target = 75% of their possible points — adjust freely. Hitting the target earns a bonus.'],
- possible:['الممكن في الفترة','الممكن في الفترة','Possible this period'],
+ possible:['الممكن في {0}','الممكن في {0}','Possible per {0}'],
  bonusOnTarget:['البونص عند تحقيق الهدف','المكافأة الإضافية عند تحقيق الهدف','Bonus on hitting target'],
  readyTitle:['«{0}» جاهزة!','«{0}» جاهزة!','“{0}” is ready!'],
  periodLbl:['فترة {0} · بونص {1}٪','فترة {0} · مكافأة {1}٪','{0} period · {1}% bonus'],
@@ -421,16 +421,15 @@ function dayCap(x){ normTask(x); return x.kind==='daily' ? x.per : 0 }
 function dayDoneOf(x){ return (x.day===dToday())?(x.dayDone||0):0 }
 function addDay(x){ const d=dToday(); if(x.day!==d){ x.day=d; x.dayDone=0 } x.dayDone=(x.dayDone||0)+1 }
 function subDay(x){ if(x.day===dToday()&&x.dayDone>0) x.dayDone-- }
+function periodWord(){ return S.period==='daily'?['اليوم','اليوم','day'][LI]
+  :(S.period==='monthly'?['الشهر','الشهر','month'][LI]:['الأسبوع','الأسبوع','week'][LI]) }
+function times(n){ if(LI===2) return n+'×'; return n===1?'مرة':(n===2?'مرتين':n+' مرات') }
+function kindWord(k){ return k==='daily' ? ['كل يوم','كل يوم','Every day'][LI]
+  : (LI===2?'Per '+periodWord():'في '+periodWord()) }
 function freqText(x){
   normTask(x);
-  const D=[['مرة في اليوم','مرة يوميًا','once a day'],['مرتين في اليوم','مرتان يوميًا','twice a day'],
-    ['٣ مرات في اليوم','٣ مرات يوميًا','3× a day'],['٤ مرات في اليوم','٤ مرات يوميًا','4× a day'],
-    ['٥ مرات في اليوم','٥ مرات يوميًا','5× a day']];
-  const P=[['مرة في الفترة','مرة في الفترة','once a period'],['مرتين في الفترة','مرتان في الفترة','twice a period'],
-    ['٣ مرات في الفترة','٣ مرات في الفترة','3× a period'],['٤ مرات في الفترة','٤ مرات في الفترة','4× a period'],
-    ['٥ مرات في الفترة','٥ مرات في الفترة','5× a period']];
-  const L=(x.kind==='daily'?D:P)[Math.min(4,Math.max(1,x.per))-1];
-  return L[LI]||L[1];
+  if(x.kind==='daily') return LI===2?`every day, ${x.per}×`:`كل يوم · ${times(x.per)}`;
+  return LI===2?`${x.per}× per ${periodWord()}`:`${times(x.per)} في ${periodWord()}`;
 }
 function possible(k){ return (k.tasks||[]).reduce((a,x)=>a+x.pts*capOf(x),0) }
 function doneOf(x){ return x.done||0 }
@@ -724,12 +723,15 @@ function tfForm(){
     <input class="inp" value="${tf.name}" placeholder="${t('taskPh')}" oninput="tfName(this.value)">
     <label class="lbl" style="margin-top:10px">${t('icon')}</label>
     <div class="row" style="flex-wrap:wrap;gap:6px">${TF_ICONS.map(i=>`<button class="btn ${tf.ico===i?'btn-gold':'btn-ghost'}" style="padding:7px 10px;font-size:17px" onclick="tfIco('${i}')">${i}</button>`).join('')}</div>
-    <div class="row" style="margin-top:12px;justify-content:space-between"><span class="lbl" style="margin:0">${t('points')}</span>${stepperH('tfPts','+'+tf.pts)}</div>
-    <label class="lbl" style="margin-top:10px">${t('repeat')}</label>
-    <div class="seg" style="width:100%;margin-bottom:8px">
-      <button class="${tf.kind==='daily'?'on':''}" style="flex:1" onclick="tfKind('daily')">${['يومية — تتجدد كل صباح','يومية — تتجدد كل صباح','Daily — resets each morning'][LI]}</button>
-      <button class="${tf.kind!=='daily'?'on':''}" style="flex:1" onclick="tfKind('period')">${['في الفترة — أي يوم','في الفترة — أي يوم','Per period — any day'][LI]}</button></div>
-    <div class="row" style="justify-content:space-between"><span class="lbl" style="margin:0">${tf.kind==='daily'?['مرات في اليوم','مرات في اليوم','Times per day'][LI]:['مرات في الفترة','مرات في الفترة','Times per period'][LI]}</span>${stepperH('tfPer','×'+tf.per)}</div>
+    ${S.period!=='daily'?`<label class="lbl" style="margin-top:12px">${t('repeat')}</label>
+    <div class="seg" style="width:100%">
+      <button class="${tf.kind==='daily'?'on':''}" style="flex:1" onclick="tfKind('daily')">${kindWord('daily')}</button>
+      <button class="${tf.kind!=='daily'?'on':''}" style="flex:1" onclick="tfKind('period')">${kindWord('period')}</button></div>
+    <p class="t-sub" style="margin:5px 2px 0">${tf.kind==='daily'
+      ?['بتتجدد كل صباح','تتجدد كل صباح','Resets every morning'][LI]
+      :[`يعملها في أي يوم خلال ${periodWord()}`,`ينفذها في أي يوم خلال ${periodWord()}`,`Any day during the ${periodWord()}`][LI]}</p>`:''}
+    <div class="row" style="margin-top:12px;justify-content:space-between"><span class="lbl" style="margin:0">${tf.kind==='daily'?['كام مرة في اليوم؟','كم مرة في اليوم؟','How many times a day?'][LI]:[`كام مرة في ${periodWord()}؟`,`كم مرة في ${periodWord()}؟`,`How many times per ${periodWord()}?`][LI]}</span>${stepperH('tfPer',tf.per)}</div>
+    <div class="row" style="margin-top:9px;justify-content:space-between"><span class="lbl" style="margin:0">${['نقط كل مرة','نقاط كل مرة','Points each time'][LI]}</span>${stepperH('tfPts',tf.pts)}</div>
     <div class="row" style="margin-top:14px;gap:8px"><button class="btn btn-teal grow" onclick="tfSave()">${t('save')} ✓</button>
     <button class="btn btn-ghost" onclick="tf.on=false;render()">${t('cancel')}</button></div></div>`;
 }
@@ -797,7 +799,7 @@ function wizardHTML(){
       <p class="t-sub">${t('religiousSub')}</p></div>${toggleH(w.religious,'wRel()',t('religious'))}</div>
       <div class="card row"><div class="ico">📅</div><div class="grow"><p class="t-name">${t('periodL')}</p>
       <p class="t-sub">${t('periodSub')}</p></div>
-      <div class="seg">${[['daily','daily'],['weekly','weekly'],['monthly','monthly']].map(p=>`<button class="${w.period===p[1]?'on':''}" onclick="wPeriod('${p[1]}')">${t(p[0])}</button>`).join('')}</div></div>
+      <div class="seg">${['daily','weekly'].map(p=>`<button class="${w.period===p?'on':''}" onclick="wPeriod('${p}')">${t(p)}</button>`).join('')}</div></div>
       <div class="card"><div class="row"><div class="ico">🔒</div><div class="grow"><p class="t-name">${t('parentPinL')}</p>
       <p class="t-sub">${t('parentPinSub')}</p></div></div>
       <input class="inp" inputmode="numeric" maxlength="6" value="${w.pin}" placeholder="••••" style="margin-top:8px;text-align:center;letter-spacing:8px" oninput="wPin(this.value)"></div>`;
@@ -813,17 +815,23 @@ function wizardHTML(){
     body=`<h2>${k.av} ${t('tasksFor',k.name)}</h2><p class="lead">${t('tasksSub',k.age)}</p>${copy}`+
       sel.map(x=>`<div class="card" style="${x.on?'':'opacity:.55'}">
         <div class="row"><button class="cbx${x.on?' on':''}" onclick="wItem('${x.id}')" aria-label="${nm(x)}">${x.on?'✓':''}</button>
-        <div class="ico">${x.ico}</div><div class="grow"><p class="t-name" style="font-size:13.5px">${nm(x)}</p>
-        <p class="t-sub">${freqText(x)} · ${['المجموع','المجموع','total'][LI]} <b class="num">${capOf(x)*x.pts}</b></p></div>
+        <div class="ico">${x.ico}</div><div class="grow"><p class="t-name" style="font-size:14px">${nm(x)}</p>
+        <p class="t-sub">${freqText(x)} · ${x.pts} ${['نقط للمرة','نقاط للمرة','pts each'][LI]}</p>
+        <p class="t-sub"><b>${['المجموع في','المجموع في','Total per'][LI]} ${periodWord()}: ${capOf(x)*x.pts}</b></p></div>
         <button class="del-x" onclick="wDelItem('${x.id}')">✕</button></div>
-        <div class="row" style="margin-top:8px;gap:7px;flex-wrap:wrap;justify-content:space-between">
-          <div class="seg"><button class="${x.kind==='daily'?'on':''}" onclick="wKind('${x.id}','daily')">${['يومية','يومية','Daily'][LI]}</button><button class="${x.kind!=='daily'?'on':''}" onclick="wKind('${x.id}','period')">${['في الفترة','في الفترة','Per period'][LI]}</button></div>
-          <div class="row" style="gap:7px">
-            <div class="stepper"><button onclick="wPer('${x.id}',-1)">−</button><span class="v num">×${x.per}</span><button onclick="wPer('${x.id}',1)">+</button></div>
-            <div class="stepper"><button onclick="wBump('${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="wBump('${x.id}',1)">+</button></div>
-          </div></div></div>`).join('')+
+        ${x.on?`<div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
+          ${S.period!=='daily'?`<div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <span class="lbl" style="margin:0">${['المهمة دي','هذه المهمة','This task'][LI]}</span>
+            <div class="seg"><button class="${x.kind==='daily'?'on':''}" onclick="wKind('${x.id}','daily')">${kindWord('daily')}</button><button class="${x.kind!=='daily'?'on':''}" onclick="wKind('${x.id}','period')">${kindWord('period')}</button></div></div>`:''}
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <span class="lbl" style="margin:0">${x.kind==='daily'?['كام مرة في اليوم؟','كم مرة في اليوم؟','How many times a day?'][LI]:[`كام مرة في ${periodWord()}؟`,`كم مرة في ${periodWord()}؟`,`How many times per ${periodWord()}?`][LI]}</span>
+            <div class="stepper"><button onclick="wPer('${x.id}',-1)">−</button><span class="v num">${x.per}</span><button onclick="wPer('${x.id}',1)">+</button></div></div>
+          <div class="row" style="justify-content:space-between">
+            <span class="lbl" style="margin:0">${['نقط كل مرة','نقاط كل مرة','Points each time'][LI]}</span>
+            <div class="stepper"><button onclick="wBump('${x.id}',-1)">−</button><span class="v num">${x.pts}</span><button onclick="wBump('${x.id}',1)">+</button></div></div>
+        </div>`:''}</div>`).join('')+
       tfForm()+
-      `<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 ${t('possibleWeek',wPoss(w.ki))}</p></div>`;
+      `<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 ${t('possibleWeek',wPoss(w.ki),periodWord())}</p></div>`;
     foot=backB+`<button class="btn btn-teal" onclick="wNext()">${w.ki<w.kids.length-1?(LI===2?'Next child →':'الطفل التالي ←'):t('next')+' ←'}</button>`;
   }
   else if(w.step===5){
@@ -840,7 +848,7 @@ function wizardHTML(){
   else if(w.step===6){
     body=`<h2>🎯 ${t('targetTitle')}</h2><p class="lead">${t('targetSub')}</p>`+
       w.kids.map((k,i)=>`<div class="card row"><div class="ico">${k.av}</div><div class="grow">
-        <p class="t-name">${k.name}</p><p class="t-sub num">${t('possible')}: ${wPoss(i)}</p></div>
+        <p class="t-name">${k.name}</p><p class="t-sub num">${t('possible',periodWord())}: ${wPoss(i)}</p></div>
         <div class="stepper"><button onclick="wTarget(${i},-1)">−</button><span class="v num">${w.targets[i]}</span><button onclick="wTarget(${i},1)">+</button></div></div>`).join('')+
       `<div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">${t('bonusOnTarget')}</p></div>${stepperH('wBonus',w.bonus,'%')}</div>`;
     foot=backB+nextB;
@@ -1605,17 +1613,23 @@ function parentSettings(){
         ${S.kids.map(x=>`<button class="btn ${x.id===tk.id?'btn-teal':'btn-ghost'} btn-sm" onclick="S.ui.taskKid='${x.id}';render()">${x.av} ${x.name}</button>`).join('')}</div></div>`:''}
       ${tk.tasks.map(x=>`<div class="card">
         <div class="row"><div class="ico">${x.ico}</div><div class="grow">
-        <p class="t-name" style="font-size:13.5px">${nm(x)}</p>
-        <p class="t-sub">${freqText(x)} · ${capOf(x)} × ${x.pts} = <b class="num">${capOf(x)*x.pts}</b></p></div>
+        <p class="t-name" style="font-size:14px">${nm(x)}</p>
+        <p class="t-sub">${freqText(x)} · ${x.pts} ${['نقط للمرة','نقاط للمرة','pts each'][LI]}</p>
+        <p class="t-sub"><b>${['المجموع في','المجموع في','Total per'][LI]} ${periodWord()}: ${capOf(x)*x.pts}</b></p></div>
         ${S.ui.delTask===tk.id+x.id
           ? `<button class="btn btn-coral btn-sm" onclick="delTask('${tk.id}','${x.id}')">${['متأكد؟','تأكيد','Sure?'][LI]}</button>`
           : `<button class="del-x" onclick="delTask('${tk.id}','${x.id}')">✕</button>`}</div>
-        <div class="row" style="margin-top:8px;gap:7px;flex-wrap:wrap;justify-content:space-between">
-          <div class="seg"><button class="${x.kind==='daily'?'on':''}" onclick="setKind('${tk.id}','${x.id}','daily')">${['يومية','يومية','Daily'][LI]}</button><button class="${x.kind!=='daily'?'on':''}" onclick="setKind('${tk.id}','${x.id}','period')">${['في الفترة','في الفترة','Per period'][LI]}</button></div>
-          <div class="row" style="gap:7px">
-            <div class="stepper"><button onclick="bumpPer('${tk.id}','${x.id}',-1)">−</button><span class="v num">×${x.per}</span><button onclick="bumpPer('${tk.id}','${x.id}',1)">+</button></div>
-            <div class="stepper"><button onclick="bumpTask('${tk.id}','${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="bumpTask('${tk.id}','${x.id}',1)">+</button></div>
-          </div></div></div>`).join('')}
+        <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
+          ${S.period!=='daily'?`<div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <span class="lbl" style="margin:0">${['المهمة دي','هذه المهمة','This task'][LI]}</span>
+            <div class="seg"><button class="${x.kind==='daily'?'on':''}" onclick="setKind('${tk.id}','${x.id}','daily')">${kindWord('daily')}</button><button class="${x.kind!=='daily'?'on':''}" onclick="setKind('${tk.id}','${x.id}','period')">${kindWord('period')}</button></div></div>`:''}
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <span class="lbl" style="margin:0">${x.kind==='daily'?['كام مرة في اليوم؟','كم مرة في اليوم؟','How many times a day?'][LI]:[`كام مرة في ${periodWord()}؟`,`كم مرة في ${periodWord()}؟`,`How many times per ${periodWord()}?`][LI]}</span>
+            <div class="stepper"><button onclick="bumpPer('${tk.id}','${x.id}',-1)">−</button><span class="v num">${x.per}</span><button onclick="bumpPer('${tk.id}','${x.id}',1)">+</button></div></div>
+          <div class="row" style="justify-content:space-between">
+            <span class="lbl" style="margin:0">${['نقط كل مرة','نقاط كل مرة','Points each time'][LI]}</span>
+            <div class="stepper"><button onclick="bumpTask('${tk.id}','${x.id}',-1)">−</button><span class="v num">${x.pts}</span><button onclick="bumpTask('${tk.id}','${x.id}',1)">+</button></div></div>
+        </div></div>`).join('')}
       <div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">
         💡 ${['مجموع الممكن لـ'+tk.name,'مجموع الممكن لـ'+tk.name,'Total possible for '+tk.name][LI]}: <b class="num">${possible(tk)}</b>
         · ${['الهدف','الهدف','target'][LI]} <b class="num">${tk.target}</b>
@@ -1638,7 +1652,7 @@ function parentSettings(){
 
     <div class="sec"><p class="sec-t">🏆 ${['الفترة والبونص','الفترة والمكافأة','Period & bonus'][LI]}</p>
       <div class="card row"><div class="ico">📅</div><div class="grow"><p class="t-name">${t('periodL')}</p></div>
-        <div class="seg">${['daily','weekly','monthly'].map(p=>`<button class="${S.period===p?'on':''}" onclick="setPeriod('${p}')">${t(p)}</button>`).join('')}</div></div>
+        <div class="seg">${['daily','weekly'].map(p=>`<button class="${S.period===p?'on':''}" onclick="setPeriod('${p}')">${t(p)}</button>`).join('')}</div></div>
       <div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">${t('bonusOnTarget')}</p></div>${stepperH('bumpBonus',S.bonusPct,'%')}</div></div>
 
     <div class="sec"><p class="sec-t">🔒 ${['حماية واجهة بابا وماما','حماية واجهة ولي الأمر','Parent area protection'][LI]}</p>

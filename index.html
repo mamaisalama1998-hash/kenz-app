@@ -1,0 +1,989 @@
+<title>كنز — نموذج تجريبي تفاعلي</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#159A92">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="كنز">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --teal:#159A92; --teal-deep:#0C6B65; --gold:#F5B93D; --gold-deep:#D99A18;
+    --coral:#FF7A6B; --ink:#23414D; --ink-soft:#5E7986;
+    --ground:#FFF7EC; --card:#FFFFFF; --line:#F0E2CC; --chip:#E6F5F3;
+    --good:#2FA05A; --shadow:0 10px 26px rgba(35,65,77,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#EDF4F2; --ink-soft:#9DB4AE; --ground:#121F1E; --card:#1B2E2C;
+      --line:#2A4340; --chip:#173734; --gold:#FFCB55; --coral:#FF8B7D;
+      --shadow:0 10px 26px rgba(0,0,0,.35); }
+  }
+  :root[data-theme="dark"]{ --ink:#EDF4F2; --ink-soft:#9DB4AE; --ground:#121F1E; --card:#1B2E2C;
+    --line:#2A4340; --chip:#173734; --gold:#FFCB55; --coral:#FF8B7D;
+    --shadow:0 10px 26px rgba(0,0,0,.35); }
+  :root[data-theme="light"]{ --teal:#159A92; --teal-deep:#0C6B65; --gold:#F5B93D; --gold-deep:#D99A18;
+    --coral:#FF7A6B; --ink:#23414D; --ink-soft:#5E7986; --ground:#FFF7EC; --card:#FFFFFF;
+    --line:#F0E2CC; --chip:#E6F5F3; --shadow:0 10px 26px rgba(35,65,77,.10); }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; background:var(--ground); color:var(--ink);
+       font-family:"Segoe UI","Tahoma","Arial",sans-serif; direction:rtl}
+  button{font-family:inherit; cursor:pointer; border:0}
+  button:focus-visible{outline:3px solid var(--gold); outline-offset:2px}
+
+  .page{max-width:920px; margin:0 auto; padding:28px 16px 56px; display:flex; flex-direction:column; align-items:center; gap:18px}
+  .page-head{text-align:center; max-width:56ch}
+  .brand{display:inline-flex; align-items:center; gap:10px; margin-bottom:6px}
+  .brand .bx{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(150deg,var(--gold),var(--gold-deep)); box-shadow:var(--shadow)}
+  .brand h1{margin:0; font-size:30px; font-weight:800}
+  .brand .en{font-size:12px; letter-spacing:.22em; color:var(--ink-soft); font-weight:700}
+  .page-head p{margin:4px 0 0; color:var(--ink-soft); font-size:14.5px; line-height:1.8}
+
+  .role-switch{display:flex; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:4px; gap:4px; box-shadow:var(--shadow)}
+  .role-switch button{background:transparent; color:var(--ink-soft); font-size:14px; font-weight:700; border-radius:999px; padding:9px 22px}
+  .role-switch button.on{background:var(--teal); color:#fff}
+
+  /* phone */
+  .phone{width:360px; max-width:100%; background:var(--card); border:1px solid var(--line);
+    border-radius:44px; padding:12px; box-shadow:var(--shadow)}
+  .screen{border-radius:34px; overflow:hidden; background:var(--ground); border:1px solid var(--line);
+    height:700px; display:flex; flex-direction:column; position:relative}
+  .body{flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom:8px}
+
+  .hero{color:#fff; padding:18px 18px 46px; position:relative;
+    background:linear-gradient(160deg,var(--teal) 0%,var(--teal-deep) 100%)}
+  .hero.parent{background:linear-gradient(160deg,#2E5A6B,#1D3D4A)}
+  .hero .hi{font-size:13px; opacity:.85; margin:0 0 2px}
+  .hero h2{margin:0; font-size:20px; font-weight:800; padding-left:84px; text-wrap:balance}
+  .hero .side-el{position:absolute; left:14px; top:12px; text-align:center}
+
+  .float-card{margin:-34px 14px 0; background:var(--card); border:1px solid var(--line);
+    border-radius:20px; padding:14px 16px; box-shadow:var(--shadow); position:relative}
+
+  .sec{padding:14px 14px 4px}
+  .sec-t{font-size:13px; font-weight:800; color:var(--ink-soft); margin:0 4px 8px}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:13px 14px; margin-bottom:10px}
+
+  .row{display:flex; align-items:center; gap:12px}
+  .grow{flex:1; min-width:0}
+
+  .bar{height:13px; border-radius:999px; background:var(--chip); overflow:hidden; position:relative}
+  .bar>i{position:absolute; inset:0 0 0 auto; border-radius:999px; display:block;
+    background:linear-gradient(90deg,var(--gold),var(--gold-deep))}
+  .bar.teal>i{background:linear-gradient(90deg,var(--teal),var(--teal-deep))}
+  @media (prefers-reduced-motion: no-preference){ .bar>i{transition:width .5s ease} }
+
+  .muted{color:var(--ink-soft)}
+  .small{font-size:12.5px}
+  .num{font-variant-numeric:tabular-nums}
+
+  .ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:var(--chip);flex:0 0 auto}
+  .t-name{font-size:15px;font-weight:700;margin:0}
+  .t-sub{font-size:12.5px;color:var(--ink-soft);margin:2px 0 0}
+  .t-sub b{color:var(--teal-deep)}
+  :root[data-theme="dark"] .t-sub b{color:var(--teal)}
+
+  .btn{border-radius:999px; padding:9px 16px; font-size:14px; font-weight:700}
+  .btn-teal{background:var(--teal); color:#fff}
+  .btn-gold{background:var(--gold); color:#5B4300}
+  .btn-ghost{background:var(--chip); color:var(--teal-deep)}
+  :root[data-theme="dark"] .btn-ghost{color:var(--teal)}
+  .btn-coral{background:#FFEDEA; color:#B3402F}
+  :root[data-theme="dark"] .btn-coral{background:#4A2622; color:#FFB4A8}
+  .btn[disabled]{opacity:.45; cursor:not-allowed}
+
+  .stamp{display:inline-flex; align-items:center; gap:6px; background:var(--chip); color:var(--teal-deep);
+    font-size:12.5px; font-weight:700; border-radius:999px; padding:8px 12px; flex:0 0 auto}
+  :root[data-theme="dark"] .stamp{color:var(--teal)}
+  .stamp.ok{background:#E7F6EC; color:#1F7A42}
+  :root[data-theme="dark"] .stamp.ok{background:#1E3A2A; color:#7BD8A0}
+  .stamp.no{background:#FFEDEA; color:#B3402F}
+  :root[data-theme="dark"] .stamp.no{background:#4A2622; color:#FFB4A8}
+
+  .beads{display:flex; gap:6px; margin-top:6px}
+  .bead{width:17px;height:17px;border-radius:50%;background:var(--chip);border:2px solid var(--line)}
+  .bead.on{background:var(--gold); border-color:var(--gold-deep)}
+
+  /* quest */
+  .quest{background:linear-gradient(150deg,#5E60CE,#4348A8); color:#fff; border:0}
+  .quest .bar{background:rgba(255,255,255,.22)}
+  .quest .t-sub{color:rgba(255,255,255,.85)}
+  .quest .t-sub b{color:#FFD98A}
+
+  /* jar */
+  .jar-wrap{display:flex; gap:16px; align-items:center}
+  .jar{width:86px; height:110px; border:3px solid var(--gold-deep); border-radius:14px 14px 26px 26px;
+    position:relative; overflow:hidden; background:var(--card); flex:0 0 auto}
+  .jar::before{content:""; position:absolute; top:-3px; left:14px; right:14px; height:8px;
+    background:var(--gold-deep); border-radius:0 0 8px 8px}
+  .jar>i{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(180deg,var(--gold),var(--gold-deep)); display:block}
+  @media (prefers-reduced-motion: no-preference){ .jar>i{transition:height .5s ease} }
+  .jar .pct{position:absolute; inset:0; display:grid; place-items:center; font-weight:800; font-size:16px; color:var(--ink)}
+
+  /* mascot */
+  .mascot-chip{display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.18);
+    border-radius:999px; padding:3px 10px; font-size:11px; font-weight:700; color:#fff; margin-top:4px}
+
+  /* nav */
+  .nav{display:flex; justify-content:space-around; padding:9px 6px 12px; background:var(--card); border-top:1px solid var(--line)}
+  .nav button{display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; color:var(--ink-soft); font-weight:700; background:none; padding:0 6px}
+  .nav button .dot{width:34px;height:32px;border-radius:12px;display:grid;place-items:center;font-size:17px}
+  .nav button.on{color:var(--teal-deep)}
+  :root[data-theme="dark"] .nav button.on{color:var(--teal)}
+  .nav button.on .dot{background:var(--chip)}
+  .nav .badge{position:relative}
+  .nav .badge::after{content:attr(data-n); position:absolute; top:-4px; left:-4px; background:var(--coral); color:#fff;
+    font-size:10px; font-weight:800; border-radius:999px; min-width:17px; height:17px; display:grid; place-items:center; padding:0 4px}
+
+  /* rewards */
+  .rw-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 14px}
+  .rw{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:12px; text-align:center; position:relative}
+  .rw .big{font-size:34px}
+  .rw .nm{font-size:13.5px; font-weight:700; margin:6px 0 2px}
+  .rw .cost{font-size:12.5px; color:var(--gold-deep); font-weight:800}
+  :root[data-theme="dark"] .rw .cost{color:var(--gold)}
+  .rw .btn{width:100%; margin-top:8px; padding:7px 0; font-size:13px}
+  .rw .fav{position:absolute; top:8px; left:8px; font-size:15px}
+
+  /* stories */
+  .value-week{background:linear-gradient(150deg,var(--gold),var(--gold-deep)); color:#5B3F00; border:0}
+  .story .ico{font-size:24px}
+
+  /* fairness meter */
+  .meter{height:16px; border-radius:999px; overflow:hidden; display:flex}
+  .meter .pos{background:var(--teal)}
+  .meter .neg{background:var(--coral)}
+
+  .stepper{display:flex; align-items:center; gap:7px; flex:0 0 auto}
+  .stepper button{width:30px; height:30px; border-radius:10px; background:var(--chip); color:var(--teal-deep); font-size:17px; font-weight:800; display:grid; place-items:center}
+  :root[data-theme="dark"] .stepper button{color:var(--teal)}
+  .stepper .v{min-width:36px; text-align:center; font-weight:800; font-size:15px}
+  .seg{display:flex; background:var(--chip); border-radius:999px; padding:3px; gap:3px; flex:0 0 auto}
+  .seg button{border-radius:999px; padding:5px 10px; font-size:11px; font-weight:700; background:transparent; color:var(--ink-soft)}
+  .seg button.on{background:var(--card); color:var(--teal-deep); box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  :root[data-theme="dark"] .seg button.on{color:var(--teal)}
+
+  .toggle{width:46px; height:26px; border-radius:999px; background:var(--chip); position:relative; flex:0 0 auto; border:1px solid var(--line)}
+  .toggle::after{content:""; position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%; background:var(--ink-soft)}
+  .toggle.on{background:var(--teal)}
+  .toggle.on::after{right:auto; left:2px; background:#fff}
+  @media (prefers-reduced-motion: no-preference){ .toggle::after{transition:all .2s ease} }
+
+  /* ceremony */
+  .overlay{position:absolute; inset:0; z-index:30; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:26px; color:#fff;
+    background:linear-gradient(165deg,#0C6B65 0%,#159A92 55%,#F5B93D 160%)}
+  .overlay h2{font-size:26px; margin:10px 0 4px; text-wrap:balance}
+  .overlay .res{background:rgba(255,255,255,.14); border-radius:20px; padding:16px 22px; margin:14px 0; width:100%; max-width:260px}
+  .overlay .res .r{display:flex; justify-content:space-between; font-size:15px; margin:7px 0; font-weight:700}
+  .overlay .res .r b{color:#FFE29A}
+  .cert{background:#FFFDF6; color:#5B4300; border:3px double var(--gold-deep); border-radius:16px; padding:16px 18px; width:100%; max-width:270px; margin-bottom:14px}
+  .cert h3{margin:0 0 4px; font-size:17px}
+  .cert p{margin:0; font-size:13px; line-height:1.7}
+  .confetti{position:absolute; inset:0; overflow:hidden; pointer-events:none}
+  .cf{position:absolute; width:9px; height:14px; top:-20px; border-radius:2px; opacity:.95}
+  @media (prefers-reduced-motion: no-preference){
+    .cf{animation:fall linear forwards}
+    @keyframes fall{ to{ transform:translateY(760px) rotate(540deg); opacity:.7 } }
+    .pop{animation:pop .45s ease}
+    @keyframes pop{ 0%{transform:scale(.6); opacity:0} 100%{transform:scale(1); opacity:1} }
+  }
+
+  .hint{font-size:12.5px; color:var(--ink-soft); text-align:center; max-width:46ch; line-height:1.8}
+
+  /* wizard */
+  .wiz{display:flex; flex-direction:column; height:100%; background:var(--ground)}
+  .wiz-body{flex:1; overflow-y:auto; padding:20px 16px 10px}
+  .wiz-foot{display:flex; gap:10px; padding:12px 14px; border-top:1px solid var(--line); background:var(--card)}
+  .wiz-foot .btn{flex:1; padding:12px 0; font-size:15px}
+  .dots{display:flex; gap:6px; justify-content:center; padding:12px 0 2px}
+  .dots i{width:8px; height:8px; border-radius:50%; background:var(--line)}
+  .dots i.on{background:var(--teal); width:20px; border-radius:999px}
+  .wiz h2{font-size:21px; margin:6px 0 4px; text-wrap:balance}
+  .wiz .lead{color:var(--ink-soft); font-size:13.5px; line-height:1.8; margin:0 0 16px}
+  .inp{width:100%; padding:12px 13px; border:1.5px solid var(--line); border-radius:13px;
+    font:inherit; font-size:15px; background:var(--card); color:var(--ink)}
+  .inp:focus{outline:none; border-color:var(--teal)}
+  .lbl{font-size:12.5px; font-weight:700; color:var(--ink-soft); margin:0 2px 6px; display:block}
+  .kidrow{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px; margin-bottom:10px}
+  .kidrow .r2{display:flex; gap:8px; margin-top:8px; align-items:center}
+  .sel{padding:10px 12px; border:1.5px solid var(--line); border-radius:12px; font:inherit; background:var(--card); color:var(--ink)}
+  .gpill{display:flex; background:var(--chip); border-radius:999px; padding:3px; gap:3px}
+  .gpill button{border-radius:999px; padding:7px 13px; font-size:15px; background:transparent}
+  .gpill button.on{background:var(--card); box-shadow:0 1px 4px rgba(0,0,0,.15)}
+  .cbx{width:27px; height:27px; border-radius:9px; border:2px solid var(--line); background:var(--card);
+    display:grid; place-items:center; color:#fff; font-weight:800; font-size:15px; flex:0 0 auto}
+  .cbx.on{background:var(--teal); border-color:var(--teal)}
+  .del-x{background:transparent; color:var(--coral); font-size:17px; font-weight:800; padding:4px 8px}
+
+  /* phones */
+  @media (max-width:520px){
+    .page{padding:10px 8px 24px; gap:10px}
+    .page-head p{display:none}
+    .brand h1{font-size:24px}
+    .brand .bx{width:36px;height:36px;font-size:19px}
+    .phone{width:100%; border-radius:26px; padding:7px}
+    .screen{border-radius:20px; height:calc(100dvh - 175px); min-height:540px}
+    .hint{display:none}
+  }
+</style>
+
+<div class="page">
+  <div class="page-head">
+    <div class="brand">
+      <span class="bx">💰</span>
+      <div style="text-align:right">
+        <h1>كنز</h1>
+        <span class="en">KENZ</span>
+      </div>
+    </div>
+    <p>نموذج تجريبي تفاعلي — كل الأزرار شغالة. جرّب دور الطفل، سجّل مهمة، ثم انتقل لدور ولي الأمر واعتمدها، وشاهد النقاط تتحرك. لا تنسَ زر «احتفال نهاية الأسبوع» 🎉</p>
+  </div>
+
+  <div class="role-switch" id="roles">
+    <button id="rb-child" class="on" onclick="setRole('child')">👦 حمزة (الطفل)</button>
+    <button id="rb-parent" onclick="setRole('parent')">🧔 بابا (ولي الأمر)</button>
+    <button id="rb-wiz" onclick="startWizard()">🪄 الإعداد الأول</button>
+  </div>
+  <p class="hint" id="sync" style="display:block;margin:0"></p>
+
+  <div class="phone">
+    <div class="screen" id="screen"></div>
+  </div>
+
+  <p class="hint">دورة النقاط كاملة: تم ✓ من الطفل ← موافقة ولي الأمر ← نقاط الأسبوع ← تحقيق الهدف ← بونص + احتفال ← المحفظة وبرطمان الادخار.</p>
+</div>
+
+<script>
+'use strict';
+const S = {
+  mode:'app', role:'child', childTab:'today', parentTab:'family',
+  kidName:'حمزة', kidAge:8, kid2Name:'سدرة', kid2Age:11,
+  target:90, bonusPct:10, week:62, wallet:145,
+  mascotLvl:3,
+  goal:{name:'لعبة ليجو', ico:'🧱', cost:250},
+  quest:{name:'رحلة أكوا بارك 🎢', total:400, prog:265},
+  prayers:3,
+  features:{jar:true, quest:true, mascot:true, ceremony:true, stories:true, religious:true},
+  period:'أسبوعية',
+  tasks:[
+    {id:'pray', name:'الصلاة', ico:'🕌', pts:2, freq:'كل صلاة', type:'prayer'},
+    {id:'teeth', name:'غسل الأسنان', ico:'🦷', pts:2, freq:'مرتان يوميًا', st:'open'},
+    {id:'hw', name:'الواجب المدرسي', ico:'📚', pts:5, freq:'قبل ٧ مساءً', st:'open'},
+    {id:'room', name:'ترتيب الغرفة', ico:'🧸', pts:4, freq:'٣ مرات أسبوعيًا', st:'open'},
+  ],
+  behaviors:[
+    {id:'shout', name:'صوت مرتفع', ico:'📢', pts:3},
+    {id:'hit', name:'ضرب الأخ/الأخت', ico:'🤜', pts:5},
+    {id:'lie', name:'كذب متعمد', ico:'🤥', pts:5},
+  ],
+  notifs:[
+    {id:'sub', name:'طلبات الإنجاز', mode:'ملخص'},
+    {id:'rw', name:'طلبات المكافآت', mode:'فوري'},
+    {id:'ded', name:'الخصومات والاعتراضات', mode:'فوري'},
+  ],
+  followers:[ {name:'جدو أحمد', ico:'👴', child:'حمزة', perm:'عرض + تشجيع'} ],
+  pending:[ {id:'p1', child:'سدرة', name:'حفظ القرآن', ico:'📖', pts:5} ],
+  rewards:[
+    {id:'ice', name:'آيس كريم', ico:'🍦', cost:30, st:'open'},
+    {id:'ipad', name:'وقت آيباد إضافي', ico:'📱', cost:40, st:'open'},
+    {id:'cinema', name:'سينما مع بابا', ico:'🎬', cost:120, st:'open'},
+    {id:'lego', name:'لعبة ليجو', ico:'🧱', cost:250, st:'open', fav:true},
+  ],
+  packs:[
+    {id:'ramadan', name:'باقة رمضان', ico:'🌙', sub:'صيام، تراويح، عمل خير يومي', on:false},
+    {id:'exams', name:'باقة الامتحانات', ico:'✏️', sub:'مذاكرة مركزة ونوم مبكر', on:true},
+    {id:'summer', name:'باقة الصيف', ico:'🏖️', sub:'قراءة، رياضة، مهارة جديدة', on:false},
+  ],
+  toast:null, ceremony:false, cert:false,
+};
+let seq=1;
+
+function esc(s){return s}
+function pct(a,b){return Math.min(100, Math.round(a/b*100))}
+
+/* ---------- family cloud sync (npoint.io) ---------- */
+const STORE='kenz-proto-v3';
+const SYNC_KEYS=['familyName','kidName','kidAge','kid2Name','kid2Age','target','bonusPct','week','wallet',
+  'mascotLvl','goal','quest','prayers','features','period','tasks','behaviors','notifs','followers',
+  'pending','rewards','packs'];
+let famToken=null, rev=0, lastSnap='', applyingRemote=false, pushTimer=null, pollTimer=null, syncStatus='off';
+
+function packState(){ const o={rev:rev, seq:seq}; SYNC_KEYS.forEach(k=>o[k]=S[k]); return o }
+function applyState(d){
+  if(!d||typeof d!=='object')return;
+  rev=d.rev||0; if(d.seq>seq) seq=d.seq;
+  SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) S[k]=d[k] });
+}
+function save(){ try{ localStorage.setItem(STORE, JSON.stringify({famToken:famToken, role:S.role, cache:packState()})) }catch(e){} }
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem(STORE));
+    if(d){ famToken=d.famToken||null; if(d.cache){ applyState(d.cache); if(d.role) S.role=d.role; return true } }
+  }catch(e){}
+  return false;
+}
+function resetAll(){ try{ localStorage.removeItem(STORE) }catch(e){} location.href=location.pathname }
+
+function renderSync(){
+  const el=document.getElementById('sync'); if(!el)return;
+  if(!famToken){ el.innerHTML='📴 نسخة محلية — البيانات على هذا الهاتف فقط'; return }
+  if(syncStatus==='syncing') el.innerHTML='🔄 جارِ المزامنة…';
+  else if(syncStatus==='ok') el.innerHTML='🟢 متزامن مع كل هواتف العائلة';
+  else el.innerHTML='🔴 لا يوجد اتصال — سيُعاد الاتصال تلقائيًا';
+}
+async function cloudCreate(){
+  syncStatus='syncing'; renderSync();
+  try{
+    const r=await fetch('https://www.npoint.io/documents',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:JSON.stringify(packState())})});
+    const d=await r.json();
+    if(d && d.token){ famToken=d.token; syncStatus='ok'; save(); startPoll(); renderSync(); return d.token }
+  }catch(e){}
+  syncStatus='err'; renderSync(); return null;
+}
+async function cloudPush(){
+  if(!famToken)return;
+  rev++;
+  const body=JSON.stringify(packState());
+  syncStatus='syncing'; renderSync();
+  try{
+    const r=await fetch('https://api.npoint.io/'+famToken,{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:body});
+    syncStatus=r.ok?'ok':'err';
+  }catch(e){ syncStatus='err' }
+  renderSync(); save();
+}
+function queuePush(){ if(!famToken)return; clearTimeout(pushTimer); pushTimer=setTimeout(cloudPush, 700) }
+async function cloudPull(){
+  if(!famToken)return false;
+  try{
+    const r=await fetch('https://api.npoint.io/'+famToken+'?_='+Date.now());
+    if(!r.ok) throw 0;
+    const d=await r.json();
+    if((d.rev||0)>rev){
+      applyingRemote=true; applyState(d); render(); applyingRemote=false;
+    }
+    syncStatus='ok'; renderSync(); save(); return true;
+  }catch(e){ syncStatus='err'; renderSync(); return false }
+}
+function startPoll(){
+  if(pollTimer||!famToken)return;
+  pollTimer=setInterval(()=>{ if(document.visibilityState==='visible') cloudPull() }, 5000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') cloudPull() });
+}
+function snapNow(){ const o={seq:seq}; SYNC_KEYS.forEach(k=>o[k]=S[k]); return JSON.stringify(o) }
+function maybeSync(){
+  const snap=snapNow();
+  if(snap!==lastSnap){ lastSnap=snap; if(!applyingRemote) queuePush() }
+}
+function famLink(){ return location.origin+location.pathname+'?fam='+famToken }
+function shareWhats(){
+  const msg='انضموا لعائلتنا في تطبيق كنز 💰🎉\n'+famLink();
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+function copyLink(){
+  const t=famLink();
+  if(navigator.clipboard){ navigator.clipboard.writeText(t).then(()=>{S.toast='✓ اتنسخ الرابط — ابعته لأي هاتف';render()}) }
+  else { prompt('انسخ الرابط:', t) }
+}
+function joinFamily(v){
+  const m=(v||'').match(/[a-f0-9]{16,32}/i);
+  if(!m){ S.toast='الرابط مش مظبوط — الصق الرابط كاملًا'; render(); return }
+  famToken=m[0]; S.mode='app'; S.role='child'; save();
+  syncStatus='syncing'; renderSync(); render();
+  cloudPull().then(ok=>{
+    if(ok){ S.toast='🎉 اتوصلت بعائلتك — أهلًا بيك!'; startPoll() }
+    else { S.toast='معرفناش نوصل للعائلة — اتأكد من الرابط والنت'; famToken=null; save() }
+    render();
+  });
+}
+
+/* ---------- actions ---------- */
+function setRole(r){ S.mode='app'; S.role=r; S.toast=null;
+  document.getElementById('rb-child').classList.toggle('on', r==='child');
+  document.getElementById('rb-parent').classList.toggle('on', r==='parent');
+  render();
+}
+function goChild(t){ S.childTab=t; render() }
+function goParent(t){ S.parentTab=t; render() }
+
+function submitTask(id){
+  const t=S.tasks.find(x=>x.id===id); if(!t||t.st!=='open')return;
+  t.st='pending';
+  S.pending.push({id:'q'+(seq++), child:S.kidName, name:t.name, ico:t.ico, pts:t.pts, taskId:id});
+  render();
+}
+function prayBead(){
+  if(S.prayers>=5)return;
+  S.prayers++;
+  const pr=S.tasks.find(x=>x.type==='prayer');
+  S.pending.push({id:'q'+(seq++), child:S.kidName, name:'الصلاة ('+['الفجر','الظهر','العصر','المغرب','العشاء'][S.prayers-1]+')', ico:'🕌', pts:(pr?pr.pts:2), taskId:'pray'});
+  render();
+}
+function approve(id){
+  const i=S.pending.findIndex(p=>p.id===id); if(i<0)return;
+  const p=S.pending[i]; S.pending.splice(i,1);
+  if(p.child===S.kidName){ S.week+=p.pts; S.quest.prog=Math.min(S.quest.total,S.quest.prog+p.pts);
+    const t=S.tasks.find(x=>x.id===p.taskId); if(t&&t.type!=='prayer') t.st='approved';
+  }
+  S.toast='✓ اعتمدت «'+p.name+'» — أُضيفت '+p.pts+' نقاط';
+  render();
+}
+function reject(id){
+  const i=S.pending.findIndex(p=>p.id===id); if(i<0)return;
+  const p=S.pending[i]; S.pending.splice(i,1);
+  if(p.child===S.kidName){ const t=S.tasks.find(x=>x.id===p.taskId); if(t&&t.type!=='prayer') t.st='rejected'; }
+  S.toast='رُفض «'+p.name+'» مع سبب — الطفل يقدر يحاول تاني';
+  render();
+}
+function retry(id){ const t=S.tasks.find(x=>x.id===id); if(t) t.st='open'; render() }
+function askReward(id){
+  const r=S.rewards.find(x=>x.id===id); if(!r||r.st!=='open'||S.wallet<r.cost)return;
+  r.st='asked'; S.toast='أُرسل الطلب وحُجزت '+r.cost+' نقطة لحين الموافقة'; render();
+}
+function togglePack(id){ const p=S.packs.find(x=>x.id===id); p.on=!p.on;
+  S.toast=p.on ? 'فُعّلت '+p.name+' — ستُضاف مهامها من الفترة القادمة' : 'أُوقفت '+p.name; render();
+}
+function toggleFeature(k){
+  S.features[k]=!S.features[k];
+  if(k==='stories' && !S.features.stories && S.childTab==='stories') S.childTab='today';
+  const names={jar:'برطمان الادخار', quest:'مهمة العائلة', mascot:'المرفق كنزي', ceremony:'احتفال نهاية الأسبوع', stories:'الحكايات', religious:'المحتوى الديني'};
+  S.toast=(S.features[k]?'فُعّل ':'أُخفي ')+names[k]+' من تطبيق الطفل — جرّب بنفسك من دور حمزة';
+  render();
+}
+function bumpTask(id,d){ const t=S.tasks.find(x=>x.id===id); t.pts=Math.max(1,t.pts+d); render() }
+function bumpBeh(id,d){ const b=S.behaviors.find(x=>x.id===id); b.pts=Math.max(1,b.pts+d); render() }
+function bumpTarget(d){ S.target=Math.max(10,S.target+d*5); render() }
+function bumpBonus(d){ S.bonusPct=Math.min(50,Math.max(0,S.bonusPct+d*5)); render() }
+function setPeriod(p){ S.period=p; S.toast='فترة التقييم أصبحت '+p+' — تسري من الفترة القادمة'; render() }
+function setNotif(id,m){ S.notifs.find(n=>n.id===id).mode=m; render() }
+function openCeremony(){ S.ceremony=true; S.cert=false; render(); confetti() }
+function closeCeremony(){ S.ceremony=false; render() }
+function showCert(){ S.cert=true; render(); confetti() }
+
+function confetti(){
+  const box=document.getElementById('cfbox'); if(!box)return;
+  const cols=['#F5B93D','#FF7A6B','#159A92','#5E60CE','#FFFFFF'];
+  let h='';
+  for(let i=0;i<55;i++){
+    h+='<span class="cf" style="left:'+(Math.random()*100)+'%;background:'+cols[i%5]+
+       ';animation-duration:'+(2.2+Math.random()*2)+'s;animation-delay:'+(Math.random()*0.8)+'s"></span>';
+  }
+  box.innerHTML=h;
+}
+
+/* ---------- mascot ---------- */
+function mascotSVG(sz){
+  const gems = S.mascotLvl>=3 ? '<circle cx="22" cy="30" r="3" fill="#FF7A6B"/><circle cx="32" cy="28" r="3.4" fill="#5E60CE"/><circle cx="42" cy="30" r="3" fill="#2FA05A"/>' : '';
+  const crown = S.week>=S.target ? '<path d="M24 12l4 5 4-7 4 7 4-5v7H24z" fill="#FFE29A" stroke="#D99A18"/>' : '';
+  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 64 64" aria-hidden="true">'+
+    '<rect x="10" y="24" width="44" height="26" rx="6" fill="#B4762A"/>'+
+    '<rect x="10" y="20" width="44" height="12" rx="6" fill="#8E5A1D"/>'+
+    '<rect x="28" y="26" width="8" height="10" rx="2" fill="#F5B93D"/>'+
+    gems+
+    '<circle cx="24" cy="42" r="2.6" fill="#FFF7EC"/><circle cx="40" cy="42" r="2.6" fill="#FFF7EC"/>'+
+    '<path d="M26 47q6 4.5 12 0" stroke="#FFF7EC" stroke-width="2.4" fill="none" stroke-linecap="round"/>'+
+    crown+
+    '<path d="M8 18l2.5-2.5M56 18l-2.5-2.5M32 10v-3" stroke="#F5B93D" stroke-width="2" stroke-linecap="round"/></svg>';
+}
+
+/* ---------- child screens ---------- */
+function taskRow(t){
+  if(t.type==='prayer'){
+    let beads=''; for(let i=0;i<5;i++) beads+='<span class="bead'+(i<S.prayers?' on':'')+'"></span>';
+    const done=S.prayers>=5;
+    return '<div class="card row"><div class="ico">🕌</div><div class="grow">'+
+      '<p class="t-name">الصلاة</p><div class="beads">'+beads+'</div></div>'+
+      (done?'<span class="stamp ok">ما شاء الله ✓</span>'
+           :'<button class="btn btn-teal" onclick="prayBead()">صلّيت ✓</button>')+'</div>';
+  }
+  let act='';
+  if(t.st==='open') act='<button class="btn btn-teal" onclick="submitTask(\''+t.id+'\')">تم ✓</button>';
+  else if(t.st==='pending') act='<span class="stamp">في انتظار بابا ⏳</span>';
+  else if(t.st==='approved') act='<span class="stamp ok">+'+t.pts+' ✓</span>';
+  else if(t.st==='rejected') act='<button class="btn btn-coral" onclick="retry(\''+t.id+'\')">حاول تاني ↻</button>';
+  return '<div class="card row"><div class="ico">'+t.ico+'</div><div class="grow">'+
+    '<p class="t-name">'+t.name+'</p><p class="t-sub"><b>+'+t.pts+'</b> · '+t.freq+'</p></div>'+act+'</div>';
+}
+
+function mascotBlock(){
+  return S.features.mascot ? '<div class="side-el">'+mascotSVG(62)+'<div class="mascot-chip">كنزي · مستوى '+S.mascotLvl+'</div></div>' : '';
+}
+function childToday(){
+  const hit=S.week>=S.target;
+  return '<div class="hero"><p class="hi">صباح الخير 👋</p><h2>'+(hit?'وصلت للهدف يا كنز! 🎉':'يا بطل، كنزك بيكبر النهارده')+'</h2>'+
+    mascotBlock()+'</div>'+
+
+    '<div class="float-card"><div class="row" style="justify-content:space-between;margin-bottom:8px">'+
+    '<span class="small muted" style="font-weight:700">هدف الأسبوع</span>'+
+    '<span class="num" style="font-weight:800"><span style="color:var(--gold-deep);font-size:20px">'+S.week+'</span> / '+S.target+'</span></div>'+
+    '<div class="bar"><i style="width:'+pct(S.week,S.target)+'%"></i></div>'+
+    '<p class="small muted" style="margin:8px 0 0">'+
+    (hit?'<b style="color:var(--good)">الهدف اتحقق! البونص +'+Math.round(S.week*S.bonusPct/100)+' مستنيك في نهاية الأسبوع 🏆</b>'
+        :'باقي <b style="color:var(--ink)">'+(S.target-S.week)+' نقطة</b> — والبونص '+S.bonusPct+'% مستنيك 🌟')+'</p></div>'+
+
+    (S.features.quest ? '<div class="sec"><div class="card quest row"><div class="ico" style="background:rgba(255,255,255,.16)">🎢</div>'+
+    '<div class="grow"><p class="t-name">مهمة العائلة: '+S.quest.name+'</p>'+
+    '<div class="bar" style="margin-top:6px"><i style="width:'+pct(S.quest.prog,S.quest.total)+'%;background:linear-gradient(90deg,#FFD98A,#F5B93D)"></i></div>'+
+    '<p class="t-sub" style="margin-top:5px">كل العائلة جمعت <b>'+S.quest.prog+'</b> من '+S.quest.total+' — إيد واحدة! 🤝</p></div></div></div>' : '')+
+
+    '<div class="sec"><p class="sec-t">مهام اليوم</p>'+
+    S.tasks.filter(t=>S.features.religious || t.type!=='prayer').map(taskRow).join('') +'</div>'+
+    (S.features.ceremony ? '<div style="text-align:center;padding:4px 0 14px"><button class="btn btn-gold" onclick="openCeremony()">🎉 جرّب احتفال نهاية الأسبوع</button></div>' : '');
+}
+
+function childWallet(){
+  const p=pct(S.wallet,S.goal.cost);
+  return '<div class="hero"><p class="hi">محفظتي</p><h2>كنزي الحقيقي 💰</h2>'+mascotBlock()+'</div>'+
+    '<div class="float-card" style="text-align:center"><p class="small muted" style="margin:0;font-weight:700">رصيدي المتراكم</p>'+
+    '<p class="num" style="font-size:38px;font-weight:800;margin:2px 0;color:var(--gold-deep)">'+S.wallet+'</p>'+
+    '<p class="small muted" style="margin:0">نقطة — الرصيد لا يقل أبدًا بسبب الخصومات</p></div>'+
+
+    (S.features.jar ? '<div class="sec"><p class="sec-t">برطمان الادخار 🎯</p>'+
+    '<div class="card jar-wrap"><div class="jar"><i style="height:'+p+'%"></i><span class="pct num">'+p+'%</span></div>'+
+    '<div class="grow"><p class="t-name">'+S.goal.ico+' '+S.goal.name+'</p>'+
+    '<p class="t-sub">هدفي: '+S.goal.cost+' نقطة · معايا '+S.wallet+'</p>'+
+    '<p class="t-sub" style="margin-top:4px">باقي <b>'+Math.max(0,S.goal.cost-S.wallet)+' نقطة</b> وتبقى ملكك! استمر 💪</p></div></div></div>' : '')+
+
+    '<div class="sec"><p class="sec-t">آخر الحركات</p>'+
+    '<div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">بونص الأسبوع الماضي</p><p class="t-sub">تحقق الهدف 84/80</p></div><span class="stamp ok">+8</span></div>'+
+    '<div class="card row"><div class="ico">📥</div><div class="grow"><p class="t-name">صافي الأسبوع الماضي</p><p class="t-sub">انتقل للمحفظة</p></div><span class="stamp ok">+84</span></div>'+
+    '<div class="card row"><div class="ico">🍦</div><div class="grow"><p class="t-name">آيس كريم</p><p class="t-sub">مكافأة منفذة</p></div><span class="stamp no">−30</span></div></div>';
+}
+
+function childRewards(){
+  return '<div class="hero"><p class="hi">متجر المكافآت</p><h2>على إيه هتصرف كنزك؟ 🎁</h2>'+mascotBlock()+'</div>'+
+    '<div class="float-card row"><div class="ico">💰</div><div class="grow"><p class="t-name num">رصيدك: '+S.wallet+' نقطة</p>'+
+    '<p class="t-sub">المكافأة المطلوبة تُحجز نقاطها حتى موافقة بابا أو ماما</p></div></div>'+
+    '<div style="height:14px"></div><div class="rw-grid">'+
+    S.rewards.map(r=>{
+      const can=S.wallet>=r.cost;
+      const btn = r.st==='asked' ? '<button class="btn btn-ghost" disabled>قيد المراجعة ⏳</button>'
+        : can ? '<button class="btn btn-teal" onclick="askReward(\''+r.id+'\')">اطلبها</button>'
+        : '<button class="btn btn-ghost" disabled>كمّل ادخار 💪</button>';
+      return '<div class="rw">'+(r.fav?'<span class="fav">⭐</span>':'')+'<div class="big">'+r.ico+'</div>'+
+        '<p class="nm">'+r.name+'</p><p class="cost num">'+r.cost+' نقطة</p>'+btn+'</div>';
+    }).join('')+'</div><div style="height:14px"></div>';
+}
+
+function childStories(){
+  return '<div class="hero"><p class="hi">حكايات</p><h2>حكاية قبل النوم؟ 📖</h2>'+mascotBlock()+'</div>'+
+    '<div class="float-card value-week row"><div class="ico" style="background:rgba(255,255,255,.35)">🤲</div>'+
+    '<div class="grow"><p class="t-name">قيمة الأسبوع: الأمانة</p>'+
+    '<p class="t-sub" style="color:#6B4A00">كل الحكايات دي عن الأمانة — والقراءة للمتعة، مش للنقاط 😉</p></div></div>'+
+    '<div class="sec">'+
+    '<div class="card story row"><div class="ico">🐪</div><div class="grow"><p class="t-name">الراعي الأمين</p><p class="t-sub">٥ دقائق · مكتوبة + مسموعة 🎧</p></div><button class="btn btn-ghost">اقرأ</button></div>'+
+    '<div class="card story row"><div class="ico">🧺</div><div class="grow"><p class="t-name">المحفظة المفقودة</p><p class="t-sub">٤ دقائق · مصورة 🎨</p></div><button class="btn btn-ghost">اقرأ</button></div>'+
+    '<div class="card story row"><div class="ico">🔬</div><div class="grow"><p class="t-name">العالِم الصغير ابن الهيثم</p><p class="t-sub">٦ دقائق · علماء ومخترعون</p></div><button class="btn btn-ghost">اقرأ</button></div>'+
+    '<div class="card story row" style="opacity:.75"><div class="ico">🌙</div><div class="grow"><p class="t-name">قصص رمضان</p><p class="t-sub">تظهر مع تفعيل باقة رمضان</p></div><span class="stamp">قريبًا</span></div>'+
+    '</div>';
+}
+
+function childNav(){
+  let tabs=[['today','☀️','يومي'],['wallet','💰','كنزي'],['rewards','🎁','مكافآتي'],['stories','📖','حكايات']];
+  if(!S.features.stories) tabs=tabs.filter(t=>t[0]!=='stories');
+  return '<div class="nav">'+tabs.map(t=>'<button class="'+(S.childTab===t[0]?'on':'')+'" onclick="goChild(\''+t[0]+'\')"><span class="dot">'+t[1]+'</span>'+t[2]+'</button>').join('')+'</div>';
+}
+
+/* ---------- parent screens ---------- */
+function parentFamily(){
+  return '<div class="hero parent"><p class="hi">لوحة العائلة</p><h2>عائلة سلامة 👨‍👩‍👧‍👦</h2>'+
+    '<div class="side-el" style="font-size:44px">🏡</div></div>'+
+    '<div class="float-card row"><div class="ico">⏳</div><div class="grow"><p class="t-name">'+S.pending.length+' طلبات في انتظارك</p>'+
+    '<p class="t-sub">اعتمدها كلها بضغطة من تبويب الموافقات</p></div>'+
+    '<button class="btn btn-teal" onclick="goParent(\'approve\')">راجِع</button></div>'+
+    '<div class="sec"><p class="sec-t">الأطفال</p>'+
+    '<div class="card"><div class="row"><div class="ico">👦</div><div class="grow"><p class="t-name">'+S.kidName+' · '+S.kidAge+' سنوات</p>'+
+    '<p class="t-sub num">هدف الفترة: '+S.week+' / '+S.target+'</p></div>'+
+    (S.week>=S.target?'<span class="stamp ok">حقق الهدف 🏆</span>':'<span class="stamp">'+pct(S.week,S.target)+'%</span>')+'</div>'+
+    '<div class="bar" style="margin-top:10px"><i style="width:'+pct(S.week,S.target)+'%"></i></div></div>'+
+    (S.kid2Name?'<div class="card"><div class="row"><div class="ico">👧</div><div class="grow"><p class="t-name">'+S.kid2Name+' · '+S.kid2Age+' سنة</p>'+
+    '<p class="t-sub num">هدف الفترة: 71 / 85</p></div><span class="stamp">84%</span></div>'+
+    '<div class="bar" style="margin-top:10px"><i style="width:84%"></i></div></div>':'')+'</div>'+
+    '<div class="sec"><p class="sec-t">مهمة العائلة المشتركة</p>'+
+    '<div class="card quest row"><div class="ico" style="background:rgba(255,255,255,.16)">🎢</div>'+
+    '<div class="grow"><p class="t-name">'+S.quest.name+'</p>'+
+    '<div class="bar" style="margin-top:6px"><i style="width:'+pct(S.quest.prog,S.quest.total)+'%;background:linear-gradient(90deg,#FFD98A,#F5B93D)"></i></div>'+
+    '<p class="t-sub num" style="margin-top:5px">'+S.quest.prog+' / '+S.quest.total+' — نقاط الطفلين تُحسب معًا</p></div></div></div>';
+}
+
+function parentApprove(){
+  const list = S.pending.length ? S.pending.map(p=>
+    '<div class="card"><div class="row"><div class="ico">'+p.ico+'</div><div class="grow">'+
+    '<p class="t-name">'+p.name+'</p><p class="t-sub">'+p.child+' · <b>+'+p.pts+'</b> نقاط · منذ دقائق</p></div></div>'+
+    '<div class="row" style="margin-top:10px;gap:8px">'+
+    '<button class="btn btn-teal grow" onclick="approve(\''+p.id+'\')">اعتماد ✓</button>'+
+    '<button class="btn btn-coral" onclick="reject(\''+p.id+'\')">رفض بسبب</button></div></div>').join('')
+    : '<div class="card" style="text-align:center;padding:26px"><div style="font-size:36px">🎈</div><p class="t-name" style="margin-top:6px">لا توجد طلبات معلقة</p><p class="t-sub">كل حاجة متراجعة — يوم هادي</p></div>';
+  return '<div class="hero parent"><p class="hi">الموافقات</p><h2>طلبات الإنجاز ⏳</h2>'+
+    '<div class="side-el" style="font-size:44px">✅</div></div>'+
+    '<div class="float-card row"><div class="ico">💡</div><p class="t-sub grow" style="margin:0">الاعتماد بشري دائمًا — لا نقاط بدون موافقتك. يمكن اعتماد يوم كامل دفعة واحدة.</p></div>'+
+    '<div class="sec">'+list+'</div>';
+}
+
+function parentReports(){
+  return '<div class="hero parent"><p class="hi">التقارير</p><h2>فترة '+S.kidName+' 📊</h2>'+
+    '<div class="side-el" style="font-size:44px">📈</div></div>'+
+    '<div class="float-card"><div class="row" style="justify-content:space-between"><span class="small muted" style="font-weight:700">ميزان العدالة</span><span class="small" style="font-weight:800;color:var(--good)">صحي ✓</span></div>'+
+    '<div class="meter" style="margin-top:8px"><span class="pos" style="width:92%"></span><span class="neg" style="width:8%"></span></div>'+
+    '<p class="small muted" style="margin:8px 0 0">92% نقاط إيجابية مقابل 8% خصومات — الإيجابي دائمًا أثقل. لو الخصومات عدّت 25% هننبهك بلطف.</p></div>'+
+    '<div class="sec"><p class="sec-t">أرقام الأسبوع</p>'+
+    '<div class="card row"><div class="ico">➕</div><div class="grow"><p class="t-name">نقاط إيجابية معتمدة</p></div><span class="stamp ok num">+'+S.week+'</span></div>'+
+    '<div class="card row"><div class="ico">➖</div><div class="grow"><p class="t-name">خصومات</p><p class="t-sub">صوت مرتفع ×١</p></div><span class="stamp no num">−3</span></div>'+
+    '<div class="card row"><div class="ico">🎯</div><div class="grow"><p class="t-name">نسبة تحقيق الهدف</p></div><span class="stamp num">'+pct(S.week,S.target)+'%</span></div>'+
+    '<div class="card row"><div class="ico">💪</div><div class="grow"><p class="t-name">أقوى عادة</p><p class="t-sub">غسل الأسنان — 14/14</p></div><span class="stamp ok">ممتاز</span></div>'+
+    '<div class="card row"><div class="ico">👀</div><div class="grow"><p class="t-name">تحتاج اهتمام</p><p class="t-sub">ترتيب الغرفة — 1/3</p></div><span class="stamp">اقتراح جاهز</span></div></div>'+
+    '<div class="sec"><p class="sec-t">اقتراح التطبيق</p>'+
+    '<div class="card row"><div class="ico">🤖</div><p class="t-sub grow" style="margin:0">حمزة يحقق الهدف 3 أسابيع متتالية — نقترح رفع التارجت من 90 إلى 95. <b>لن يتغير شيء بدون موافقتك.</b></p></div></div>';
+}
+
+function stepper(fn,val,suffix){
+  return '<div class="stepper"><button onclick="'+fn+'(-1)" aria-label="أقل">−</button>'+
+    '<span class="v num">'+val+(suffix||'')+'</span><button onclick="'+fn+'(1)" aria-label="أكثر">+</button></div>';
+}
+function parentSettings(){
+  const F=S.features;
+  const featRow=(k,ico,name,sub)=>'<div class="card row"><div class="ico">'+ico+'</div><div class="grow">'+
+    '<p class="t-name">'+name+'</p><p class="t-sub">'+sub+'</p></div>'+
+    '<button class="toggle'+(F[k]?' on':'')+'" onclick="toggleFeature(\''+k+'\')" aria-label="'+name+'"></button></div>';
+
+  return '<div class="hero parent"><p class="hi">الإعدادات</p><h2>غرفة تحكم بابا وماما ⚙️</h2>'+
+    '<div class="side-el" style="font-size:44px">🎛️</div></div>'+
+
+    '<div class="float-card row"><div class="ico">✨</div><p class="t-sub grow" style="margin:0">'+
+    'كل تغيير هنا يظهر فورًا في تطبيق الطفل — جرّب: أطفئ ميزة ثم ارجع لدور حمزة وشوف بنفسك. وكل تعديل يُسجَّل في سجل العائلة.</p></div>'+
+
+    '<div class="sec"><p class="sec-t">المزايا الرئيسية — شغّل أو أطفئ</p>'+
+    featRow('jar','🎯','برطمان الادخار','هدف ادخار مثبّت في محفظة الطفل')+
+    featRow('quest','🎢','مهمة العائلة','هدف مشترك يجمع نقاط كل الأطفال')+
+    featRow('mascot','📦','المرفق كنزي','شخصية تكبر مع تقدم الطفل')+
+    featRow('ceremony','🎉','احتفال نهاية الفترة','شاشة الاحتفال والشهادة عند الإغلاق')+
+    featRow('stories','📖','الحكايات','مكتبة القصص — بدون نقاط للقراءة')+
+    featRow('religious','🕌','المحتوى الديني','مهام الصلاة والقرآن وقصصها — اختياري بالكامل')+
+    '</div>'+
+
+    '<div class="sec"><p class="sec-t">الهدف والفترة والبونص</p>'+
+    '<div class="card row"><div class="ico">🎯</div><div class="grow"><p class="t-name">تارجت حمزة</p>'+
+    '<p class="t-sub">المقترح: 75% من مجموع النقاط الممكنة</p></div>'+stepper('bumpTarget',S.target)+'</div>'+
+    '<div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">البونص عند تحقيق الهدف</p></div>'+stepper('bumpBonus',S.bonusPct,'%')+'</div>'+
+    '<div class="card row"><div class="ico">📅</div><div class="grow"><p class="t-name">فترة التقييم</p></div>'+
+    '<div class="seg">'+['يومية','أسبوعية','شهرية'].map(p=>'<button class="'+(S.period===p?'on':'')+'" onclick="setPeriod(\''+p+'\')">'+p+'</button>').join('')+'</div></div></div>'+
+
+    '<div class="sec"><p class="sec-t">نقاط المهام</p>'+
+    S.tasks.filter(t=>F.religious||t.type!=='prayer').map(t=>'<div class="card row"><div class="ico">'+t.ico+'</div><div class="grow">'+
+      '<p class="t-name">'+t.name+'</p><p class="t-sub">'+t.freq+'</p></div>'+
+      '<div class="stepper"><button onclick="bumpTask(\''+t.id+'\',-1)" aria-label="أقل">−</button>'+
+      '<span class="v num">+'+t.pts+'</span><button onclick="bumpTask(\''+t.id+'\',1)" aria-label="أكثر">+</button></div></div>').join('')+
+    '<div class="card row" style="justify-content:center"><button class="btn btn-ghost">+ أضف مهمة جديدة</button></div></div>'+
+
+    '<div class="sec"><p class="sec-t">السلوكيات والخصومات</p>'+
+    '<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 الخصومات دائمًا أصغر من المكافآت — لو زادت عن الحد هننبهك في التقرير.</p></div>'+
+    S.behaviors.map(b=>'<div class="card row"><div class="ico">'+b.ico+'</div><div class="grow">'+
+      '<p class="t-name">'+b.name+'</p></div>'+
+      '<div class="stepper"><button onclick="bumpBeh(\''+b.id+'\',-1)" aria-label="أقل">−</button>'+
+      '<span class="v num" style="color:var(--coral)">−'+b.pts+'</span><button onclick="bumpBeh(\''+b.id+'\',1)" aria-label="أكثر">+</button></div></div>').join('')+'</div>'+
+
+    '<div class="sec"><p class="sec-t">الباقات الموسمية</p>'+
+    S.packs.map(p=>'<div class="card row"><div class="ico">'+p.ico+'</div><div class="grow">'+
+      '<p class="t-name">'+p.name+'</p><p class="t-sub">'+p.sub+'</p></div>'+
+      '<button class="toggle'+(p.on?' on':'')+'" onclick="togglePack(\''+p.id+'\')" aria-label="'+p.name+'"></button></div>').join('')+'</div>'+
+
+    '<div class="sec"><p class="sec-t">الأطفال وطرق الدخول</p>'+
+    '<div class="card row"><div class="ico">👦</div><div class="grow"><p class="t-name">'+S.kidName+' · '+S.kidAge+' سنوات</p><p class="t-sub">دخول بصورة + PIN بسيط</p></div><button class="btn btn-ghost">تعديل</button></div>'+
+    (S.kid2Name?'<div class="card row"><div class="ico">👧</div><div class="grow"><p class="t-name">'+S.kid2Name+' · '+S.kid2Age+' سنة</p><p class="t-sub">اسم مستخدم وكلمة مرور</p></div><button class="btn btn-ghost">تعديل</button></div>':'')+'</div>'+
+
+    '<div class="sec"><p class="sec-t">المتابعون</p>'+
+    S.followers.map(f=>'<div class="card row"><div class="ico">'+f.ico+'</div><div class="grow">'+
+      '<p class="t-name">'+f.name+'</p><p class="t-sub">متابع لـ'+f.child+' · '+f.perm+' · رسائله تمر عليك أولًا</p></div>'+
+      '<span class="stamp ok">نشط</span></div>').join('')+
+    '<div class="card row" style="justify-content:center"><button class="btn btn-ghost">+ دعوة متابع (جد/جدة/مدرب)</button></div></div>'+
+
+    '<div class="sec"><p class="sec-t">الإشعارات</p>'+
+    S.notifs.map(n=>'<div class="card row"><div class="grow"><p class="t-name" style="font-size:14px">'+n.name+'</p></div>'+
+      '<div class="seg">'+['فوري','ملخص','إيقاف'].map(m=>'<button class="'+(n.mode===m?'on':'')+'" onclick="setNotif(\''+n.id+'\',\''+m+'\')">'+m+'</button>').join('')+'</div></div>').join('')+'</div>'+
+
+    '<div class="sec"><p class="sec-t">رابط العائلة والمزامنة</p>'+
+    (famToken
+      ? '<div class="card"><p class="t-sub" style="margin:0 0 8px">أي هاتف يفتح الرابط ده بينضم لنفس العائلة ويشوف نفس البيانات لحظيًا:</p>'+
+        '<div style="word-break:break-all;font-size:11.5px;direction:ltr;text-align:center;background:var(--chip);border-radius:10px;padding:8px;margin-bottom:10px">'+famLink()+'</div>'+
+        '<div class="row" style="gap:8px"><button class="btn btn-teal grow" onclick="shareWhats()">📲 واتساب</button>'+
+        '<button class="btn btn-ghost grow" onclick="copyLink()">📋 نسخ</button></div></div>'
+      : '<div class="card row"><div class="ico">📴</div><div class="grow"><p class="t-name">نسخة محلية بدون مزامنة</p>'+
+        '<p class="t-sub">أنشئ رابط العائلة عشان باقي الهواتف تشاركك</p></div>'+
+        '<button class="btn btn-teal" onclick="cloudCreate().then(()=>{S.toast=famToken?\'🟢 الرابط جاهز — شاركه من هنا\':\'فشل الاتصال — حاول تاني\';render()})">إنشاء</button></div>')+
+    '</div>'+
+
+    '<div class="sec"><p class="sec-t">النموذج التجريبي</p>'+
+    '<div class="card row"><div class="ico">🪄</div><div class="grow"><p class="t-name">رحلة الإعداد الأول</p><p class="t-sub">جرّب كيف تدخل ماما بيانات الأطفال وتختار المهام</p></div><button class="btn btn-ghost" onclick="startWizard()">ابدأ</button></div>'+
+    '<div class="card row"><div class="ico">🔄</div><div class="grow"><p class="t-name">مسح كل البيانات والبدء من جديد</p><p class="t-sub">يمسح المحفوظ على هذا الهاتف فقط</p></div><button class="btn btn-coral" onclick="resetAll()">تصفير</button></div>'+
+    '<div style="height:10px"></div></div>';
+}
+
+function parentNav(){
+  const tabs=[['family','🏡','العائلة'],['approve','✅','الموافقات'],['reports','📊','التقارير'],['settings','⚙️','الإعدادات']];
+  return '<div class="nav">'+tabs.map(t=>{
+    const badge=t[0]==='approve'&&S.pending.length?' badge" data-n="'+S.pending.length:'';
+    return '<button class="'+(S.parentTab===t[0]?'on':'')+badge+'" onclick="goParent(\''+t[0]+'\')"><span class="dot">'+t[1]+'</span>'+t[2]+'</button>';
+  }).join('')+'</div>';
+}
+
+/* ---------- setup wizard ---------- */
+function suggestFor(age, religious){
+  const A=[];
+  if(age<5){
+    A.push({id:'teeth',name:'غسل الأسنان',ico:'🦷',pts:2,freq:'مرتان يوميًا',w:14},
+      {id:'toys',name:'ترتيب الألعاب',ico:'🧸',pts:3,freq:'مرة يوميًا',w:7},
+      {id:'polite',name:'كلمات مهذبة طول اليوم',ico:'😊',pts:2,freq:'مرة يوميًا',w:7},
+      {id:'help',name:'مساعدة بسيطة لماما',ico:'🤝',pts:3,freq:'٣ مرات أسبوعيًا',w:3},
+      {id:'sleep',name:'النوم بدري بدون زن',ico:'🌙',pts:2,freq:'كل ليلة',w:7});
+  }else if(age<=10){
+    if(religious) A.push({id:'pray',name:'الصلاة',ico:'🕌',pts:2,freq:'كل صلاة',w:35,rel:1},
+      {id:'quran',name:'ورد القرآن',ico:'📖',pts:5,freq:'مرة يوميًا',w:7,rel:1});
+    A.push({id:'teeth',name:'غسل الأسنان',ico:'🦷',pts:2,freq:'مرتان يوميًا',w:14},
+      {id:'hw',name:'الواجب المدرسي',ico:'📚',pts:5,freq:'٥ مرات أسبوعيًا',w:5},
+      {id:'sport',name:'التمرين / الرياضة',ico:'⚽',pts:10,freq:'مرتان أسبوعيًا',w:2},
+      {id:'family',name:'مساعدة الأسرة',ico:'🏡',pts:3,freq:'٣ مرات أسبوعيًا',w:3},
+      {id:'sibling',name:'معاملة حلوة مع الإخوة',ico:'💛',pts:2,freq:'مرة يوميًا',w:7},
+      {id:'room',name:'ترتيب الغرفة',ico:'🛏️',pts:4,freq:'٣ مرات أسبوعيًا',w:3});
+  }else{
+    if(religious) A.push({id:'pray',name:'الصلاة',ico:'🕌',pts:2,freq:'كل صلاة',w:35,rel:1},
+      {id:'quran',name:'ورد القرآن',ico:'📖',pts:5,freq:'مرة يوميًا',w:7,rel:1});
+    A.push({id:'study',name:'المذاكرة',ico:'📚',pts:5,freq:'٥ مرات أسبوعيًا',w:5},
+      {id:'sport',name:'الرياضة',ico:'🏀',pts:10,freq:'مرتان أسبوعيًا',w:2},
+      {id:'chore',name:'مسؤولية منزلية ثابتة',ico:'🧹',pts:4,freq:'٣ مرات أسبوعيًا',w:3},
+      {id:'time',name:'إدارة الوقت (نوم واستيقاظ)',ico:'⏰',pts:3,freq:'مرة يوميًا',w:7},
+      {id:'skill',name:'تطوير مهارة (رسم/برمجة/لغة)',ico:'🎨',pts:5,freq:'مرتان أسبوعيًا',w:2},
+      {id:'others',name:'مساعدة الآخرين',ico:'🤲',pts:3,freq:'مرتان أسبوعيًا',w:2});
+  }
+  return A.map(x=>Object.assign({on:true},x));
+}
+function startWizard(){
+  S.mode='wizard'; S.toast=null; S.ceremony=false;
+  S.wiz={step:1, family:'', kids:[{name:'',age:8,g:'👦'}], religious:true, period:'أسبوعية',
+         kidIdx:0, sel:[], selAge:[], targets:[], bonus:10};
+  document.getElementById('rb-child').classList.remove('on');
+  document.getElementById('rb-parent').classList.remove('on');
+  render();
+}
+function wizPossible(i){
+  const s=S.wiz.sel[i]||[];
+  return s.filter(x=>x.on).reduce((a,x)=>a+x.pts*x.w,0);
+}
+function wizBuildSel(i){
+  const k=S.wiz.kids[i];
+  if(!S.wiz.sel[i] || S.wiz.selAge[i]!==k.age || S.wiz.selRel!==S.wiz.religious){
+    S.wiz.sel[i]=suggestFor(k.age,S.wiz.religious); S.wiz.selAge[i]=k.age;
+  }
+}
+function wizNext(){
+  const w=S.wiz;
+  if(w.step===1){ if(!w.family.trim()) w.family='عائلتنا'; w.step=2 }
+  else if(w.step===2){
+    w.kids.forEach((k,i)=>{ if(!k.name.trim()) k.name='طفل '+(i+1) });
+    w.step=3;
+  }
+  else if(w.step===3){ w.selRel=w.religious; w.kidIdx=0; wizBuildSel(0); w.step=4 }
+  else if(w.step===4){
+    if(w.kidIdx<w.kids.length-1){ w.kidIdx++; wizBuildSel(w.kidIdx) }
+    else{ w.kids.forEach((k,i)=>{ w.targets[i]=Math.round(wizPossible(i)*0.75/5)*5 }); w.step=5 }
+  }
+  else if(w.step===5){ w.step=6 }
+  render();
+}
+function wizBack(){
+  const w=S.wiz;
+  if(w.step===4 && w.kidIdx>0){ w.kidIdx-- }
+  else if(w.step>1){ w.step--; if(w.step===4) w.kidIdx=w.kids.length-1 }
+  render();
+}
+function wizFam(v){ S.wiz.family=v }
+function wizName(i,v){ S.wiz.kids[i].name=v }
+function wizAge(i,v){ S.wiz.kids[i].age=parseInt(v,10); render() }
+function wizG(i,g){ S.wiz.kids[i].g=g; render() }
+function wizAddKid(){ if(S.wiz.kids.length<4){ S.wiz.kids.push({name:'',age:6,g:'👧'}); render() } }
+function wizDelKid(i){ if(S.wiz.kids.length>1){ S.wiz.kids.splice(i,1); S.wiz.sel.splice(i,1); S.wiz.selAge.splice(i,1); render() } }
+function wizRel(){ S.wiz.religious=!S.wiz.religious; render() }
+function wizPeriod(p){ S.wiz.period=p; render() }
+function wizItem(id){ const s=S.wiz.sel[S.wiz.kidIdx]; const x=s.find(a=>a.id===id); x.on=!x.on; render() }
+function wizBump(id,d){ const x=S.wiz.sel[S.wiz.kidIdx].find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); render() }
+function wizTarget(i,d){ S.wiz.targets[i]=Math.max(5,S.wiz.targets[i]+d*5); render() }
+function wizBonus(d){ S.wiz.bonus=Math.min(50,Math.max(0,S.wiz.bonus+d*5)); render() }
+function wizFinish(){
+  const w=S.wiz, k0=w.kids[0], sel=(w.sel[0]||[]).filter(x=>x.on);
+  S.kidName=k0.name; S.kidAge=k0.age;
+  if(w.kids[1]){ S.kid2Name=w.kids[1].name; S.kid2Age=w.kids[1].age } else { S.kid2Name='' }
+  S.familyName=w.family;
+  S.features.religious=w.religious; S.period=w.period;
+  S.tasks=sel.map(x=> x.id==='pray'
+    ? {id:'pray',name:'الصلاة',ico:'🕌',pts:x.pts,freq:'كل صلاة',type:'prayer'}
+    : {id:x.id,name:x.name,ico:x.ico,pts:x.pts,freq:x.freq,st:'open'});
+  S.target=w.targets[0]||50; S.bonusPct=w.bonus;
+  S.week=0; S.prayers=0; S.wallet=0; S.pending=[]; S.quest.prog=0;
+  S.rewards.forEach(r=>r.st='open');
+  S.mode='share'; S.role='parent'; S.parentTab='family';
+  render();
+  cloudCreate().then(t=>{ render() });
+}
+function shareHTML(){
+  const ready=!!famToken;
+  return '<div class="wiz"><div class="wiz-body" style="text-align:center">'+
+    '<div style="font-size:54px;padding-top:18px">'+(ready?'🔗':'🔄')+'</div>'+
+    '<h2>'+(ready?'رابط عائلتك جاهز!':'ثوانٍ… بنجهز رابط العائلة')+'</h2>'+
+    (ready
+      ? '<p class="lead">ابعت الرابط ده لهاتف ماما/بابا وهواتف الأطفال.<br>أي حاجة تتسجل على أي هاتف تظهر عند الجميع خلال ثوانٍ.</p>'+
+        '<div class="card" style="word-break:break-all;font-size:12px;direction:ltr;text-align:center">'+famLink()+'</div>'+
+        '<button class="btn btn-teal" style="width:100%;margin-bottom:8px;padding:13px 0" onclick="shareWhats()">📲 مشاركة على واتساب</button>'+
+        '<button class="btn btn-ghost" style="width:100%" onclick="copyLink()">📋 نسخ الرابط</button>'
+      : '<p class="lead">لو النت ضعيف هتشتغل نسخة محلية، وتقدر تعيد المحاولة من الإعدادات.</p>')+
+    '</div><div class="wiz-foot">'+
+    '<button class="btn btn-gold" style="flex:1;padding:13px 0;font-size:16px" onclick="S.mode=\'app\';S.toast=\'🎉 عائلة «\'+(S.familyName||\'عائلتنا\')+\'» جاهزة — أول فترة بدأت\';render()">ابدأ ←</button></div></div>';
+}
+function wizardHTML(){
+  const w=S.wiz;
+  const dots='<div class="dots">'+[1,2,3,4,5,6].map(n=>'<i class="'+(n<=w.step?'on':'')+'"></i>').join('')+'</div>';
+  let body='', foot='';
+  const nextBtn='<button class="btn btn-teal" onclick="wizNext()">التالي ←</button>';
+  const backBtn='<button class="btn btn-ghost" style="flex:0 0 auto;padding:12px 18px" onclick="wizBack()">→</button>';
+
+  if(w.step===1){
+    body='<div style="text-align:center;padding:22px 0 8px"><div style="font-size:54px">💰</div>'+
+      '<h2>أهلًا بيكم في كنز</h2><p class="lead">دقائق معدودة وتكون عائلتك جاهزة.<br>ماما أو بابا — أي حد يبدأ.</p></div>'+
+      '<label class="lbl">اسم العائلة</label>'+
+      '<input class="inp" value="'+w.family+'" placeholder="مثال: عائلة سلامة" oninput="wizFam(this.value)">'+
+      '<div style="text-align:center;margin-top:22px;border-top:1px dashed var(--line);padding-top:16px">'+
+      '<p class="lead" style="margin-bottom:8px">وصلك رابط عائلة من ماما أو بابا؟</p>'+
+      '<input class="inp" id="joinInp" placeholder="الصق رابط العائلة هنا" style="margin-bottom:8px">'+
+      '<button class="btn btn-ghost" style="width:100%" onclick="joinFamily(document.getElementById(\'joinInp\').value)">🔗 انضمام للعائلة</button></div>';
+    foot=nextBtn;
+  }
+  else if(w.step===2){
+    body='<h2>مين أبطالنا؟ 👧👦</h2><p class="lead">أضف الأطفال — الاسم والسن يكفوا، والتطبيق هيقترح المهام المناسبة لكل سن.</p>'+
+      w.kids.map((k,i)=>'<div class="kidrow"><div class="row">'+
+        '<input class="inp" style="flex:1" value="'+k.name+'" placeholder="اسم الطفل" oninput="wizName('+i+',this.value)">'+
+        (w.kids.length>1?'<button class="del-x" onclick="wizDelKid('+i+')" aria-label="حذف">✕</button>':'')+'</div>'+
+        '<div class="r2"><select class="sel" onchange="wizAge('+i+',this.value)">'+
+        Array.from({length:14},(_,n)=>n+2).map(a=>'<option value="'+a+'"'+(k.age===a?' selected':'')+'>'+a+' سنة</option>').join('')+'</select>'+
+        '<div class="gpill"><button class="'+(k.g==='👦'?'on':'')+'" onclick="wizG('+i+',\'👦\')">👦 ولد</button>'+
+        '<button class="'+(k.g==='👧'?'on':'')+'" onclick="wizG('+i+',\'👧\')">👧 بنت</button></div></div></div>').join('')+
+      '<button class="btn btn-ghost" style="width:100%" onclick="wizAddKid()">+ أضف طفل آخر</button>';
+    foot=backBtn+nextBtn;
+  }
+  else if(w.step===3){
+    body='<h2>قيم عائلتكم 🏡</h2><p class="lead">كل عائلة تختار طريقتها — والقرار دايمًا ليكم.</p>'+
+      '<div class="card row"><div class="ico">🕌</div><div class="grow"><p class="t-name">المحتوى الديني</p>'+
+      '<p class="t-sub">مهام الصلاة والقرآن وقصصها — اختياري بالكامل</p></div>'+
+      '<button class="toggle'+(w.religious?' on':'')+'" onclick="wizRel()" aria-label="المحتوى الديني"></button></div>'+
+      '<div class="card row"><div class="ico">📅</div><div class="grow"><p class="t-name">فترة التقييم</p>'+
+      '<p class="t-sub">نرشح الأسبوعية — نتيجة كل أسبوع تروح للمحفظة</p></div>'+
+      '<div class="seg">'+['يومية','أسبوعية','شهرية'].map(p=>'<button class="'+(w.period===p?'on':'')+'" onclick="wizPeriod(\''+p+'\')">'+p+'</button>').join('')+'</div></div>';
+    foot=backBtn+nextBtn;
+  }
+  else if(w.step===4){
+    const k=w.kids[w.kidIdx], sel=w.sel[w.kidIdx], poss=wizPossible(w.kidIdx);
+    body='<h2>مهام '+k.g+' '+k.name+'</h2>'+
+      '<p class="lead">دي اقتراحاتنا لسن '+k.age+' سنة — شيل اللي مش مناسب وعدّل النقاط زي ما تحب. <b>مفيش حاجة إجبارية.</b></p>'+
+      sel.map(x=>'<div class="card row" style="'+(x.on?'':'opacity:.55')+'">'+
+        '<button class="cbx'+(x.on?' on':'')+'" onclick="wizItem(\''+x.id+'\')" aria-label="'+x.name+'">'+(x.on?'✓':'')+'</button>'+
+        '<div class="ico">'+x.ico+'</div><div class="grow"><p class="t-name" style="font-size:14px">'+x.name+'</p>'+
+        '<p class="t-sub">'+x.freq+'</p></div>'+
+        '<div class="stepper"><button onclick="wizBump(\''+x.id+'\',-1)">−</button><span class="v num">+'+x.pts+'</span><button onclick="wizBump(\''+x.id+'\',1)">+</button></div></div>').join('')+
+      '<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 مجموع النقاط الممكنة أسبوعيًا: <b class="num">'+poss+'</b></p></div>';
+    foot=backBtn+'<button class="btn btn-teal" onclick="wizNext()">'+(w.kidIdx<w.kids.length-1?'الطفل التالي ←':'التالي ←')+'</button>';
+  }
+  else if(w.step===5){
+    body='<h2>الهدف والبونص 🎯</h2><p class="lead">اقترحنا هدف كل طفل = 75% من نقاطه الممكنة — عدّله براحتك. الطفل اللي يحقق هدفه ياخد بونص.</p>'+
+      w.kids.map((k,i)=>'<div class="card row"><div class="ico">'+k.g+'</div><div class="grow">'+
+        '<p class="t-name">'+k.name+'</p><p class="t-sub num">الممكن أسبوعيًا: '+wizPossible(i)+' نقطة</p></div>'+
+        '<div class="stepper"><button onclick="wizTarget('+i+',-1)">−</button><span class="v num">'+w.targets[i]+'</span><button onclick="wizTarget('+i+',1)">+</button></div></div>').join('')+
+      '<div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">البونص عند تحقيق الهدف</p></div>'+
+      '<div class="stepper"><button onclick="wizBonus(-1)">−</button><span class="v num">'+w.bonus+'%</span><button onclick="wizBonus(1)">+</button></div></div>';
+    foot=backBtn+nextBtn;
+  }
+  else{
+    body='<div style="text-align:center;padding:22px 0"><div style="font-size:54px">🎉</div>'+
+      '<h2>عائلة «'+w.family+'» جاهزة!</h2>'+
+      '<p class="lead">'+w.kids.map(k=>k.g+' '+k.name).join(' · ')+'<br>'+
+      'فترة '+w.period+' · بونص '+w.bonus+'%<br>كل حاجة تتعدل في أي وقت من الإعدادات.</p></div>'+
+      '<div class="card row"><div class="ico">📲</div><p class="t-sub grow" style="margin:0">في التطبيق الحقيقي، الخطوة الجاية: دعوة الطرف الثاني (بابا أو ماما) برابط، واختيار طريقة دخول كل طفل.</p></div>';
+    foot='<button class="btn btn-gold" onclick="wizFinish()" style="flex:1;padding:13px 0;font-size:16px">🚀 ابدأ أول فترة</button>';
+  }
+  return '<div class="wiz">'+dots+'<div class="wiz-body">'+body+'</div><div class="wiz-foot">'+foot+'</div></div>';
+}
+
+/* ---------- ceremony ---------- */
+function ceremonyHTML(){
+  const finalPts=Math.max(S.week,S.target)+5, bonus=Math.round(finalPts*S.bonusPct/100);
+  const inner = S.cert
+    ? '<div class="cert pop"><div style="font-size:30px">🏅</div><h3>شهادة كنز الأسبوع</h3>'+
+      '<p>تُمنح إلى <b>'+S.kidName+'</b><br>لتحقيقه هدف الأسبوع بتفوق<br>وجمعه '+(finalPts+bonus)+' نقطة كاملة</p>'+
+      '<p style="margin-top:8px;font-size:11.5px">التوقيع: بابا وماما ❤️</p></div>'+
+      '<button class="btn btn-gold" onclick="closeCeremony()">إغلاق — الشهادة اتحفظت في إنجازاتي</button>'
+    : '<div class="pop" style="font-size:56px">🏆</div><h2>أسبوع رائع يا '+S.kidName+'!</h2>'+
+      '<p style="margin:0;opacity:.9;font-size:14px">وصلت للهدف… وكنزك كبر</p>'+
+      '<div class="res"><div class="r"><span>نقاط الأسبوع</span><b class="num">'+finalPts+' / '+S.target+'</b></div>'+
+      '<div class="r"><span>بونص '+S.bonusPct+'%</span><b class="num">+'+bonus+'</b></div>'+
+      '<div class="r"><span>راح للمحفظة</span><b class="num">+'+(finalPts+bonus)+'</b></div>'+
+      '<div class="r"><span>كنزي المستوى الجديد</span><b>⬆ '+(S.mascotLvl+1)+'</b></div></div>'+
+      '<button class="btn btn-gold" onclick="showCert()">افتح شهادتك 🏅</button>'+
+      '<button class="btn" style="background:transparent;color:#fff;margin-top:8px;font-size:13px" onclick="closeCeremony()">لاحقًا</button>';
+  return '<div class="overlay"><div class="confetti" id="cfbox"></div>'+inner+'</div>';
+}
+
+/* ---------- render ---------- */
+function render(){
+  let html='';
+  if(S.mode==='wizard'){
+    html = wizardHTML();
+  }else if(S.mode==='share'){
+    html = shareHTML();
+  }else if(S.role==='child'){
+    if(!S.features.stories && S.childTab==='stories') S.childTab='today';
+    html = {today:childToday, wallet:childWallet, rewards:childRewards, stories:childStories}[S.childTab]();
+    html = '<div class="body">'+html+'</div>'+childNav();
+  }else{
+    html = {family:parentFamily, approve:parentApprove, reports:parentReports, settings:parentSettings}[S.parentTab]();
+    html = '<div class="body">'+html+'</div>'+parentNav();
+  }
+  if(S.toast && S.mode!=='wizard' && S.mode!=='share'){
+    html+='<div style="position:absolute;bottom:74px;left:12px;right:12px;z-index:20;background:var(--ink);color:var(--ground);border-radius:14px;padding:11px 14px;font-size:13px;font-weight:700;text-align:center;box-shadow:var(--shadow)">'+S.toast+'</div>';
+    setTimeout(()=>{ if(S.toast){S.toast=null; render();} }, 2600);
+  }
+  if(S.ceremony) html+=ceremonyHTML();
+  document.getElementById('screen').innerHTML=html;
+  document.getElementById('rb-child').textContent='👦 '+S.kidName+' (الطفل)';
+  document.getElementById('rb-wiz').classList.toggle('on', S.mode==='wizard');
+  if(S.mode!=='wizard'){
+    document.getElementById('rb-child').classList.toggle('on', S.role==='child');
+    document.getElementById('rb-parent').classList.toggle('on', S.role==='parent');
+  }else{
+    document.getElementById('rb-child').classList.remove('on');
+    document.getElementById('rb-parent').classList.remove('on');
+  }
+  if(S.ceremony) confetti();
+  save(); maybeSync(); renderSync();
+}
+
+/* ---------- boot ---------- */
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  try{ navigator.serviceWorker.register('sw.js') }catch(e){}
+}
+(function boot(){
+  const famQ=new URLSearchParams(location.search).get('fam');
+  const hasLocal=load();
+  lastSnap=snapNow();
+  if(famQ && /^[a-f0-9]{16,32}$/i.test(famQ) && famQ!==famToken){
+    famToken=famQ; S.mode='app'; if(!hasLocal) S.role='child';
+    save(); render();
+    cloudPull().then(ok=>{ if(ok){ S.toast='🟢 اتوصلت بعائلتك — البيانات بتتحدث تلقائيًا'; startPoll() } render() });
+  }else if(hasLocal){
+    S.mode='app'; render();
+    if(famToken){ cloudPull(); startPoll() }
+  }else{
+    startWizard();
+  }
+})();
+</script>

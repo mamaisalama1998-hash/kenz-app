@@ -285,6 +285,7 @@ const S = {
     {id:'ded', name:'الخصومات والاعتراضات', mode:'فوري'},
   ],
   followers:[ {name:'جدو أحمد', ico:'👴', child:'حمزة', perm:'عرض + تشجيع'} ],
+  deductions:[], achievements:[], parentPin:'', lastClose:null,
   pending:[ {id:'p1', child:'سدرة', name:'حفظ القرآن', ico:'📖', pts:5} ],
   rewards:[
     {id:'ice', name:'آيس كريم', ico:'🍦', cost:30, st:'open'},
@@ -308,7 +309,8 @@ function pct(a,b){return Math.min(100, Math.round(a/b*100))}
 const STORE='kenz-proto-v3';
 const SYNC_KEYS=['familyName','kidName','kidAge','kid2Name','kid2Age','target','bonusPct','week','wallet',
   'mascotLvl','goal','quest','prayers','features','period','tasks','behaviors','notifs','followers',
-  'pending','rewards','packs'];
+  'pending','rewards','packs','deductions','achievements','parentPin','lastClose'];
+let devUnlocked=false;
 let famToken=null, rev=0, lastSnap='', applyingRemote=false, pushTimer=null, pollTimer=null, syncStatus='off';
 let lastDeclined=null, lastView='';
 
@@ -318,11 +320,11 @@ function applyState(d){
   rev=d.rev||0; if(d.seq>seq) seq=d.seq;
   SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) S[k]=d[k] });
 }
-function save(){ try{ localStorage.setItem(STORE, JSON.stringify({famToken:famToken, role:S.role, lastDeclined:lastDeclined, cache:packState()})) }catch(e){} }
+function save(){ try{ localStorage.setItem(STORE, JSON.stringify({famToken:famToken, role:S.role, lastDeclined:lastDeclined, devUnlocked:devUnlocked, cache:packState()})) }catch(e){} }
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(STORE));
-    if(d){ famToken=d.famToken||null; lastDeclined=d.lastDeclined||null;
+    if(d){ famToken=d.famToken||null; lastDeclined=d.lastDeclined||null; devUnlocked=!!d.devUnlocked;
       if(d.cache){ applyState(d.cache); if(d.role) S.role=d.role; return true } }
   }catch(e){}
   return false;
@@ -405,10 +407,16 @@ function joinFamily(v){
 }
 
 /* ---------- actions ---------- */
-function setRole(r){ S.mode='app'; S.role=r; S.toast=null;
+function setRole(r){
+  if(r==='parent' && S.parentPin && !devUnlocked){ S.mode='pin'; S.pinTry=''; render(); return }
+  S.mode='app'; S.role=r; S.toast=null;
   document.getElementById('rb-child').classList.toggle('on', r==='child');
   document.getElementById('rb-parent').classList.toggle('on', r==='parent');
   render();
+}
+function tryPin(v){
+  if(v===S.parentPin){ devUnlocked=true; save(); S.mode='app'; S.role='parent'; S.toast='🔓 أهلًا يا كابتن'; render() }
+  else { S.pinErr=true; render() }
 }
 function goChild(t){ S.childTab=t; render() }
 function goParent(t){ S.parentTab=t; render() }
@@ -435,11 +443,74 @@ function approve(id){
   S.toast='✓ اعتمدت «'+p.name+'» — أُضيفت '+p.pts+' نقاط';
   render();
 }
-function reject(id){
+const REJECT_REASONS=['لم تُنفذ بالكامل','الإثبات غير واضح','العدد غير صحيح','أُرسلت بالخطأ','التنفيذ بعد الموعد','سبب آخر'];
+function reject(id){ S.rejectingId = (S.rejectingId===id? null : id); render() }
+function rejectWith(id, reason){
   const i=S.pending.findIndex(p=>p.id===id); if(i<0)return;
-  const p=S.pending[i]; S.pending.splice(i,1);
-  if(p.child===S.kidName){ const t=S.tasks.find(x=>x.id===p.taskId); if(t&&t.type!=='prayer') t.st='rejected'; }
-  S.toast='رُفض «'+p.name+'» مع سبب — الطفل يقدر يحاول تاني';
+  const p=S.pending[i]; S.pending.splice(i,1); S.rejectingId=null;
+  if(p.child===S.kidName){ const t=S.tasks.find(x=>x.id===p.taskId);
+    if(t&&t.type!=='prayer'){ t.st='rejected'; t.rejectReason=reason } }
+  S.toast='رُفض «'+p.name+'»: '+reason+' — يقدر يحاول تاني';
+  render();
+}
+
+/* deductions + appeals (PRD J03) */
+function doDeduct(bid){
+  const b=S.behaviors.find(x=>x.id===bid); if(!b)return;
+  S.week-=b.pts;
+  S.deductions.push({id:'d'+(seq++), name:b.name, ico:b.ico, pts:b.pts, st:'active', appeal:null});
+  S.toast='➖ اتسجل خصم «'+b.name+'» — '+S.kidName+' هيشوف السبب ويقدر يعترض';
+  S.parentTab='family'; render();
+}
+function startAppeal(id){ S.appealingId=(S.appealingId===id?null:id); render() }
+function sendAppeal(id){
+  const d=S.deductions.find(x=>x.id===id); if(!d)return;
+  const msg=(document.getElementById('appealInp')||{}).value||'';
+  d.appeal={msg:msg.trim()||'مش عادل 🙁', st:'open'}; S.appealingId=null;
+  S.toast='🙋 اعتراضك وصل لبابا وماما — هيردوا عليك'; render();
+}
+function decideAppeal(id, verdict){
+  const d=S.deductions.find(x=>x.id===id); if(!d||!d.appeal)return;
+  if(verdict==='cancel'){ S.week+=d.pts; d.st='cancelled'; S.toast='↩️ اتلغى الخصم ورجعت النقاط' }
+  else if(verdict==='half'){ const back=Math.ceil(d.pts/2); S.week+=back; d.pts-=back; d.st='reduced'; S.toast='⚖️ اتخفض الخصم للنصف' }
+  else { d.st='kept'; S.toast='تم تثبيت الخصم مع الشرح' }
+  d.appeal.st='closed'; render();
+}
+
+/* reward request cycle (PRD J04) */
+function decideReward(id, ok){
+  const r=S.rewards.find(x=>x.id===id); if(!r||r.st!=='asked')return;
+  if(ok){
+    if(S.wallet<r.cost){ S.toast='الرصيد أقل من التكلفة'; render(); return }
+    S.wallet-=r.cost; r.st='todo'; S.toast='🎁 اتوافقت — «'+r.name+'» بانتظار التنفيذ';
+  } else { r.st='open'; S.toast='رُفض الطلب ورجعت النقاط المحجوزة' }
+  render();
+}
+function rewardDone(id){ const r=S.rewards.find(x=>x.id===id); if(r&&r.st==='todo'){ r.st='done'; S.toast='✅ اتنفذت «'+r.name+'» — بالهنا!'; render() } }
+
+/* exceptional reward (PRD FR-036) */
+const exf={on:false,name:'',pts:5,medal:true};
+function exOpen(){ exf.on=!exf.on; exf.name=''; exf.pts=5; exf.medal=true; render() }
+function exName(v){ exf.name=v }
+function exPts(d){ exf.pts=Math.max(1,exf.pts+d); render() }
+function exMedal(){ exf.medal=!exf.medal; render() }
+function exSave(){
+  const nm=exf.name.trim()||'إنجاز مميز';
+  S.week+=exf.pts;
+  if(exf.medal) S.achievements.push({name:nm, ico:'🏅', pts:exf.pts});
+  exf.on=false; S.toast='⭐ +'+exf.pts+' لـ'+S.kidName+' عن «'+nm+'»'+(exf.medal?' + وسام 🏅':''); render();
+}
+
+/* real period close (PRD J05) */
+function closePeriod(){
+  const net=S.week, hit=net>=S.target;
+  const bonus=hit? Math.round(net*S.bonusPct/100) : 0;
+  if(net>0) S.wallet+=net+bonus;
+  if(hit) S.mascotLvl++;
+  S.lastClose={net:net, bonus:bonus, hit:hit, target:S.target};
+  S.week=0; S.prayers=0; S.deductions=[];
+  S.tasks.forEach(t=>{ if(t.type!=='prayer'){ t.st='open'; delete t.rejectReason } });
+  S.closing=false; S.ceremonyReal=true; S.ceremony=true; S.cert=false;
   render();
 }
 function retry(id){ const t=S.tasks.find(x=>x.id===id); if(t) t.st='open'; render() }
@@ -447,6 +518,7 @@ function askReward(id){
   const r=S.rewards.find(x=>x.id===id); if(!r||r.st!=='open'||S.wallet<r.cost)return;
   r.st='asked'; S.toast='أُرسل الطلب وحُجزت '+r.cost+' نقطة لحين الموافقة'; render();
 }
+function reAsk(id){ const r=S.rewards.find(x=>x.id===id); if(r&&r.st==='done'){ r.st='open'; askReward(id) } }
 function togglePack(id){ const p=S.packs.find(x=>x.id===id); p.on=!p.on;
   S.toast=p.on ? 'فُعّلت '+p.name+' — ستُضاف مهامها من الفترة القادمة' : 'أُوقفت '+p.name; render();
 }
@@ -464,7 +536,7 @@ function bumpBonus(d){ S.bonusPct=Math.min(50,Math.max(0,S.bonusPct+d*5)); rende
 function setPeriod(p){ S.period=p; S.toast='فترة التقييم أصبحت '+p+' — تسري من الفترة القادمة'; render() }
 function setNotif(id,m){ S.notifs.find(n=>n.id===id).mode=m; render() }
 function openCeremony(){ S.ceremony=true; S.cert=false; render(); confetti() }
-function closeCeremony(){ S.ceremony=false; render() }
+function closeCeremony(){ S.ceremony=false; S.ceremonyReal=false; render() }
 function showCert(){ S.cert=true; render(); confetti() }
 
 function confetti(){
@@ -508,8 +580,9 @@ function taskRow(t){
   else if(t.st==='pending') act='<span class="stamp">في انتظار بابا ⏳</span>';
   else if(t.st==='approved') act='<span class="stamp ok">+'+t.pts+' ✓</span>';
   else if(t.st==='rejected') act='<button class="btn btn-coral" onclick="retry(\''+t.id+'\')">حاول تاني ↻</button>';
+  const rej = t.st==='rejected' && t.rejectReason ? '<p class="t-sub" style="color:var(--coral)">السبب: '+t.rejectReason+'</p>' : '';
   return '<div class="card row"><div class="ico">'+t.ico+'</div><div class="grow">'+
-    '<p class="t-name">'+t.name+'</p><p class="t-sub"><b>+'+t.pts+'</b> · '+t.freq+'</p></div>'+act+'</div>';
+    '<p class="t-name">'+t.name+'</p><p class="t-sub"><b>+'+t.pts+'</b> · '+t.freq+'</p>'+rej+'</div>'+act+'</div>';
 }
 
 function mascotBlock(){
@@ -535,6 +608,23 @@ function childToday(){
 
     '<div class="sec"><p class="sec-t">مهام اليوم</p>'+
     S.tasks.filter(t=>S.features.religious || t.type!=='prayer').map(taskRow).join('') +'</div>'+
+
+    (S.deductions.filter(d=>d.st!=='cancelled').length
+      ? '<div class="sec"><p class="sec-t">خصومات الفترة دي</p>'+
+        S.deductions.filter(d=>d.st!=='cancelled').map(d=>{
+          let tail='';
+          if(d.appeal && d.appeal.st==='open') tail='<span class="stamp">اعتراضك عند بابا وماما ⏳</span>';
+          else if(d.st==='reduced') tail='<span class="stamp ok">اتخفض للنص ⚖️</span>';
+          else if(d.st==='kept') tail='<span class="stamp">اتثبت بعد النقاش</span>';
+          else tail='<button class="btn btn-ghost" style="font-size:12px" onclick="startAppeal(\''+d.id+'\')">🙋 اعتراض</button>';
+          const form=S.appealingId===d.id
+            ? '<div style="margin-top:8px"><input class="inp" id="appealInp" placeholder="قول وجهة نظرك بأدب — مثال: أنا معملتش كده، اللي حصل إن…">'+
+              '<button class="btn btn-teal" style="width:100%;margin-top:8px" onclick="sendAppeal(\''+d.id+'\')">ابعت الاعتراض 📨</button></div>'
+            : '';
+          return '<div class="card"><div class="row"><div class="ico">'+d.ico+'</div><div class="grow">'+
+            '<p class="t-name">'+d.name+'</p><p class="t-sub num" style="color:var(--coral)">−'+d.pts+' نقطة</p></div>'+tail+'</div>'+form+'</div>';
+        }).join('')+'</div>'
+      : '')+
     (S.features.ceremony ? '<div style="text-align:center;padding:4px 0 14px"><button class="btn btn-gold" onclick="openCeremony()">🎉 جرّب احتفال نهاية الأسبوع</button></div>' : '');
 }
 
@@ -551,6 +641,11 @@ function childWallet(){
     '<p class="t-sub">هدفي: '+S.goal.cost+' نقطة · معايا '+S.wallet+'</p>'+
     '<p class="t-sub" style="margin-top:4px">باقي <b>'+Math.max(0,S.goal.cost-S.wallet)+' نقطة</b> وتبقى ملكك! استمر 💪</p></div></div></div>' : '')+
 
+    (S.achievements.length
+      ? '<div class="sec"><p class="sec-t">أوسمتي 🏅</p>'+
+        S.achievements.map(a=>'<div class="card row"><div class="ico">'+a.ico+'</div><div class="grow">'+
+          '<p class="t-name">'+a.name+'</p><p class="t-sub num">مكافأة استثنائية +'+a.pts+'</p></div><span class="stamp ok">فخورين بيك</span></div>').join('')+'</div>'
+      : '')+
     '<div class="sec"><p class="sec-t">آخر الحركات</p>'+
     '<div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">بونص الأسبوع الماضي</p><p class="t-sub">تحقق الهدف 84/80</p></div><span class="stamp ok">+8</span></div>'+
     '<div class="card row"><div class="ico">📥</div><div class="grow"><p class="t-name">صافي الأسبوع الماضي</p><p class="t-sub">انتقل للمحفظة</p></div><span class="stamp ok">+84</span></div>'+
@@ -564,8 +659,11 @@ function childRewards(){
     '<div style="height:14px"></div><div class="rw-grid">'+
     S.rewards.map(r=>{
       const can=S.wallet>=r.cost;
-      const btn = r.st==='asked' ? '<button class="btn btn-ghost" disabled>قيد المراجعة ⏳</button>'
-        : can ? '<button class="btn btn-teal" onclick="askReward(\''+r.id+'\')">اطلبها</button>'
+      let btn;
+      if(r.st==='asked') btn='<button class="btn btn-ghost" disabled>قيد المراجعة ⏳</button>';
+      else if(r.st==='todo') btn='<button class="btn btn-gold" disabled>اتوافق عليها 🎉</button>';
+      else if(r.st==='done') btn = can ? '<button class="btn btn-ghost" onclick="reAsk(\''+r.id+'\')">اطلبها تاني ↻</button>' : '<button class="btn btn-ghost" disabled>اتنفذت ✓</button>';
+      else btn = can ? '<button class="btn btn-teal" onclick="askReward(\''+r.id+'\')">اطلبها</button>'
         : '<button class="btn btn-ghost" disabled>كمّل ادخار 💪</button>';
       return '<div class="rw">'+(r.fav?'<span class="fav">⭐</span>':'')+'<div class="big">'+r.ico+'</div>'+
         '<p class="nm">'+r.name+'</p><p class="cost num">'+r.cost+' نقطة</p>'+btn+'</div>';
@@ -601,8 +699,25 @@ function parentFamily(){
     '<div class="sec"><p class="sec-t">الأطفال</p>'+
     '<div class="card"><div class="row"><div class="ico">👦</div><div class="grow"><p class="t-name">'+S.kidName+' · '+S.kidAge+' سنوات</p>'+
     '<p class="t-sub num">هدف الفترة: '+S.week+' / '+S.target+'</p></div>'+
-    (S.week>=S.target?'<span class="stamp ok">حقق الهدف 🏆</span>':'<span class="stamp">'+pct(S.week,S.target)+'%</span>')+'</div>'+
-    '<div class="bar" style="margin-top:10px"><i style="width:'+pct(S.week,S.target)+'%"></i></div></div>'+
+    (S.week>=S.target?'<span class="stamp ok">حقق الهدف 🏆</span>':'<span class="stamp">'+pct(Math.max(0,S.week),S.target)+'%</span>')+'</div>'+
+    '<div class="bar" style="margin-top:10px"><i style="width:'+pct(Math.max(0,S.week),S.target)+'%"></i></div>'+
+    '<div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn btn-coral" style="font-size:12.5px" onclick="goParent(\'deduct\')">➖ تسجيل خصم</button>'+
+    '<button class="btn btn-gold" style="font-size:12.5px" onclick="exOpen()">⭐ مكافأة استثنائية</button>'+
+    (S.closing
+      ?'<button class="btn btn-teal" style="font-size:12.5px" onclick="closePeriod()">متأكد — أغلق ✓</button><button class="btn btn-ghost" style="font-size:12.5px" onclick="S.closing=false;render()">إلغاء</button>'
+      :'<button class="btn btn-ghost" style="font-size:12.5px" onclick="S.closing=true;render()">🏁 إغلاق الفترة</button>')+
+    '</div>'+
+    (exf.on
+      ?'<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">'+
+       '<input class="inp" placeholder="السبب — مثال: ساعد جاره في حمل الشنط" oninput="exName(this.value)">'+
+       '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="lbl" style="margin:0">النقاط</span>'+
+       '<div class="stepper"><button onclick="exPts(-1)">−</button><span class="v num">+'+exf.pts+'</span><button onclick="exPts(1)">+</button></div></div>'+
+       '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="lbl" style="margin:0">🏅 وسام في سجل الإنجازات</span>'+
+       '<button class="toggle'+(exf.medal?' on':'')+'" onclick="exMedal()"></button></div>'+
+       '<button class="btn btn-teal" style="width:100%;margin-top:10px" onclick="exSave()">منح المكافأة ⭐</button></div>'
+      :'')+
+    '</div>'+
     (S.kid2Name?'<div class="card"><div class="row"><div class="ico">👧</div><div class="grow"><p class="t-name">'+S.kid2Name+' · '+S.kid2Age+' سنة</p>'+
     '<p class="t-sub num">هدف الفترة: 71 / 85</p></div><span class="stamp">84%</span></div>'+
     '<div class="bar" style="margin-top:10px"><i style="width:84%"></i></div></div>':'')+'</div>'+
@@ -613,18 +728,60 @@ function parentFamily(){
     '<p class="t-sub num" style="margin-top:5px">'+S.quest.prog+' / '+S.quest.total+' — نقاط الطفلين تُحسب معًا</p></div></div></div>';
 }
 
+function parentDeduct(){
+  return '<div class="hero parent"><p class="hi">تسجيل خصم</p><h2>حصل إيه يا '+S.kidName+'؟ ➖</h2>'+
+    '<div class="side-el" style="font-size:44px">⚖️</div></div>'+
+    '<div class="float-card row"><div class="ico">💡</div><p class="t-sub grow" style="margin:0">الخصم بيظهر للطفل بسببه وقيمته، ومن حقه يعترض ويتناقش — دي فلسفة كنز: عدل مش عقاب.</p></div>'+
+    '<div class="sec">'+
+    S.behaviors.map(b=>'<div class="card row"><div class="ico">'+b.ico+'</div><div class="grow">'+
+      '<p class="t-name">'+b.name+'</p><p class="t-sub num" style="color:var(--coral)">−'+b.pts+' نقطة</p></div>'+
+      '<button class="btn btn-coral" onclick="doDeduct(\''+b.id+'\')">تسجيل</button></div>').join('')+
+    bfForm()+
+    '<div class="card row" style="justify-content:center"><button class="btn btn-ghost" onclick="goParent(\'family\')">→ رجوع</button></div></div>';
+}
 function parentApprove(){
-  const list = S.pending.length ? S.pending.map(p=>
-    '<div class="card"><div class="row"><div class="ico">'+p.ico+'</div><div class="grow">'+
+  const list = S.pending.length ? S.pending.map(p=>{
+    const reasons = S.rejectingId===p.id
+      ? '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">'+REJECT_REASONS.map(rr=>
+          '<button class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px" onclick="rejectWith(\''+p.id+'\',\''+rr+'\')">'+rr+'</button>').join('')+'</div>'
+      : '';
+    return '<div class="card"><div class="row"><div class="ico">'+p.ico+'</div><div class="grow">'+
     '<p class="t-name">'+p.name+'</p><p class="t-sub">'+p.child+' · <b>+'+p.pts+'</b> نقاط · منذ دقائق</p></div></div>'+
     '<div class="row" style="margin-top:10px;gap:8px">'+
     '<button class="btn btn-teal grow" onclick="approve(\''+p.id+'\')">اعتماد ✓</button>'+
-    '<button class="btn btn-coral" onclick="reject(\''+p.id+'\')">رفض بسبب</button></div></div>').join('')
+    '<button class="btn btn-coral" onclick="reject(\''+p.id+'\')">'+(S.rejectingId===p.id?'إلغاء':'رفض بسبب')+'</button></div>'+reasons+'</div>';
+  }).join('')
     : '<div class="card" style="text-align:center;padding:26px"><div style="font-size:36px">🎈</div><p class="t-name" style="margin-top:6px">لا توجد طلبات معلقة</p><p class="t-sub">كل حاجة متراجعة — يوم هادي</p></div>';
+
+  const appeals=S.deductions.filter(d=>d.appeal && d.appeal.st==='open');
+  const appealSec = appeals.length
+    ? '<div class="sec"><p class="sec-t">🙋 اعتراضات تحتاج قرارك</p>'+appeals.map(d=>
+      '<div class="card"><div class="row"><div class="ico">'+d.ico+'</div><div class="grow">'+
+      '<p class="t-name">خصم «'+d.name+'» −'+d.pts+'</p>'+
+      '<p class="t-sub">'+S.kidName+' بيقول: «'+d.appeal.msg+'»</p></div></div>'+
+      '<div class="row" style="margin-top:10px;gap:6px">'+
+      '<button class="btn btn-ghost grow" style="font-size:12px" onclick="decideAppeal(\''+d.id+'\',\'keep\')">تثبيت</button>'+
+      '<button class="btn btn-gold grow" style="font-size:12px" onclick="decideAppeal(\''+d.id+'\',\'half\')">تخفيض ½</button>'+
+      '<button class="btn btn-teal grow" style="font-size:12px" onclick="decideAppeal(\''+d.id+'\',\'cancel\')">إلغاء وإرجاع</button></div></div>').join('')+'</div>'
+    : '';
+
+  const asked=S.rewards.filter(r=>r.st==='asked'), todo=S.rewards.filter(r=>r.st==='todo');
+  const rwSec = (asked.length||todo.length)
+    ? '<div class="sec"><p class="sec-t">🎁 طلبات المكافآت</p>'+
+      asked.map(r=>'<div class="card row"><div class="ico">'+r.ico+'</div><div class="grow">'+
+        '<p class="t-name">'+r.name+'</p><p class="t-sub num">التكلفة '+r.cost+' · رصيد '+S.kidName+': '+S.wallet+'</p></div>'+
+        '<button class="btn btn-teal" onclick="decideReward(\''+r.id+'\',true)">موافقة</button>'+
+        '<button class="btn btn-coral" onclick="decideReward(\''+r.id+'\',false)">رفض</button></div>').join('')+
+      todo.map(r=>'<div class="card row"><div class="ico">'+r.ico+'</div><div class="grow">'+
+        '<p class="t-name">'+r.name+'</p><p class="t-sub">اتوافقت — مستنية التسليم الفعلي</p></div>'+
+        '<button class="btn btn-gold" onclick="rewardDone(\''+r.id+'\')">تم التنفيذ ✓</button></div>').join('')+'</div>'
+    : '';
+
   return '<div class="hero parent"><p class="hi">الموافقات</p><h2>طلبات الإنجاز ⏳</h2>'+
     '<div class="side-el" style="font-size:44px">✅</div></div>'+
     '<div class="float-card row"><div class="ico">💡</div><p class="t-sub grow" style="margin:0">الاعتماد بشري دائمًا — لا نقاط بدون موافقتك. يمكن اعتماد يوم كامل دفعة واحدة.</p></div>'+
-    '<div class="sec">'+list+'</div>';
+    appealSec + rwSec +
+    '<div class="sec"><p class="sec-t">طلبات الإنجاز</p>'+list+'</div>';
 }
 
 function parentReports(){
@@ -689,6 +846,18 @@ function parentSettings(){
       '<div class="stepper"><button onclick="bumpBeh(\''+b.id+'\',-1)" aria-label="أقل">−</button>'+
       '<span class="v num" style="color:var(--coral)">−'+b.pts+'</span><button onclick="bumpBeh(\''+b.id+'\',1)" aria-label="أكثر">+</button></div></div>').join('')+
     bfForm()+'</div>'+
+
+    '<div class="sec"><p class="sec-t">المكافآت والتكلفة</p>'+
+    S.rewards.map(r=>'<div class="card row"><div class="ico">'+r.ico+'</div><div class="grow">'+
+      '<p class="t-name">'+r.name+'</p><p class="t-sub num">'+r.cost+' نقطة'+(r.st==='todo'?' · بانتظار التنفيذ':'')+'</p></div>'+
+      '<div class="stepper"><button onclick="bumpReward(\''+r.id+'\',-1)">−</button><span class="v num">'+r.cost+'</span><button onclick="bumpReward(\''+r.id+'\',1)">+</button></div></div>').join('')+
+    rwForm()+'</div>'+
+
+    '<div class="sec"><p class="sec-t">الحماية</p>'+
+    '<div class="card"><div class="row"><div class="ico">🔒</div><div class="grow"><p class="t-name">الرقم السري لواجهة بابا وماما</p>'+
+    '<p class="t-sub">'+(S.parentPin?'مفعّل — الأطفال ما يقدروش يدخلوا هنا':'غير مفعّل — أي حد يقدر يفتح واجهتكم')+'</p></div></div>'+
+    '<input class="inp" inputmode="numeric" maxlength="6" placeholder="'+(S.parentPin?'غيّر الرقم':'حدد رقم سري')+'" style="margin-top:8px;text-align:center;letter-spacing:6px" id="pinSet">'+
+    '<button class="btn btn-teal" style="width:100%;margin-top:8px" onclick="setPin(document.getElementById(\'pinSet\').value)">حفظ الرقم 🔒</button></div></div>'+
 
     '<div class="sec"><p class="sec-t">الباقات الموسمية</p>'+
     S.packs.map(p=>'<div class="card row"><div class="ico">'+p.ico+'</div><div class="grow">'+
@@ -810,6 +979,7 @@ function wizG(i,g){ S.wiz.kids[i].g=g; render() }
 function wizAddKid(){ if(S.wiz.kids.length<4){ S.wiz.kids.push({name:'',age:6,g:'👧'}); render() } }
 function wizDelKid(i){ if(S.wiz.kids.length>1){ S.wiz.kids.splice(i,1); S.wiz.sel.splice(i,1); S.wiz.selAge.splice(i,1); render() } }
 function wizRel(){ S.wiz.religious=!S.wiz.religious; render() }
+function wizPin(v){ S.wiz.pin=(v||'').replace(/\D/g,'') }
 function wizPeriod(p){ S.wiz.period=p; render() }
 function wizItem(id){ const s=S.wiz.sel[S.wiz.kidIdx]; const x=s.find(a=>a.id===id); x.on=!x.on; render() }
 function wizCopy(j){
@@ -859,6 +1029,34 @@ function bfSave(){
   S.behaviors.push({id:'b'+(seq++), name:nm, ico:'⚠️', pts:bf.pts});
   bf.on=false; S.toast='✓ اتضاف سلوك «'+nm+'» للخصومات'; render();
 }
+function bumpReward(id,d){ const r=S.rewards.find(x=>x.id===id); if(r){ r.cost=Math.max(5,r.cost+d*5); render() } }
+function setPin(v){
+  const p=(v||'').replace(/\D/g,'');
+  if(p.length<4){ S.toast='الرقم لازم يكون 4 أرقام على الأقل'; render(); return }
+  S.parentPin=p; devUnlocked=true; save(); S.toast='🔒 اتفعل الرقم السري على كل الهواتف'; render();
+}
+const rwf={on:false,name:'',ico:'🎁',cost:50};
+const RW_ICONS=['🎁','🍦','🎬','🧸','⚽','🎮','🍕','🚲','📚','🏊'];
+function rwfOpen(){ rwf.on=true; rwf.name=''; rwf.ico='🎁'; rwf.cost=50; render() }
+function rwfName(v){ rwf.name=v }
+function rwfIco(i){ rwf.ico=i; render() }
+function rwfCost(d){ rwf.cost=Math.max(5,rwf.cost+d*5); render() }
+function rwfSave(){
+  const nm=rwf.name.trim()||'مكافأة جديدة';
+  S.rewards.push({id:'r'+(seq++), name:nm, ico:rwf.ico, cost:rwf.cost, st:'open'});
+  rwf.on=false; S.toast='🎁 اتضافت «'+nm+'» لمتجر '+S.kidName; render();
+}
+function rwForm(){
+  if(!rwf.on) return '<div class="card row" style="justify-content:center"><button class="btn btn-ghost" onclick="rwfOpen()">+ أضف مكافأة جديدة</button></div>';
+  return '<div class="card"><label class="lbl">اسم المكافأة</label>'+
+    '<input class="inp" value="'+rwf.name+'" placeholder="مثال: عشاء برة مع بابا" oninput="rwfName(this.value)">'+
+    '<label class="lbl" style="margin-top:10px">الأيقونة</label>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px">'+RW_ICONS.map(i=>'<button class="btn '+(rwf.ico===i?'btn-gold':'btn-ghost')+'" style="padding:7px 10px;font-size:17px" onclick="rwfIco(\''+i+'\')">'+i+'</button>').join('')+'</div>'+
+    '<div class="row" style="margin-top:12px;justify-content:space-between"><span class="lbl" style="margin:0">التكلفة بالنقاط</span>'+
+    '<div class="stepper"><button onclick="rwfCost(-1)">−</button><span class="v num">'+rwf.cost+'</span><button onclick="rwfCost(1)">+</button></div></div>'+
+    '<div class="row" style="margin-top:14px;gap:8px"><button class="btn btn-teal grow" onclick="rwfSave()">حفظ ✓</button>'+
+    '<button class="btn btn-ghost" onclick="rwf.on=false;render()">إلغاء</button></div></div>';
+}
 function bfForm(){
   if(!bf.on) return '<div class="card row" style="justify-content:center"><button class="btn btn-ghost" onclick="bfOpen()">+ أضف سلوكًا للخصم</button></div>';
   return '<div class="card"><label class="lbl">اسم السلوك</label>'+
@@ -882,7 +1080,9 @@ function wizFinish(){
     ? {id:'pray',name:'الصلاة',ico:'🕌',pts:x.pts,freq:'كل صلاة',type:'prayer'}
     : {id:x.id,name:x.name,ico:x.ico,pts:x.pts,freq:x.freq,st:'open'});
   S.target=w.targets[0]||50; S.bonusPct=w.bonus;
+  S.parentPin=w.pin||''; devUnlocked=true;
   S.week=0; S.prayers=0; S.wallet=0; S.pending=[]; S.quest.prog=0;
+  S.deductions=[]; S.achievements=[]; S.lastClose=null;
   S.rewards.forEach(r=>r.st='open');
   S.mode='share'; S.role='parent'; S.parentTab='family';
   render();
@@ -939,7 +1139,10 @@ function wizardHTML(){
       '<button class="toggle'+(w.religious?' on':'')+'" onclick="wizRel()" aria-label="المحتوى الديني"></button></div>'+
       '<div class="card row"><div class="ico">📅</div><div class="grow"><p class="t-name">فترة التقييم</p>'+
       '<p class="t-sub">نرشح الأسبوعية — نتيجة كل أسبوع تروح للمحفظة</p></div>'+
-      '<div class="seg">'+['يومية','أسبوعية','شهرية'].map(p=>'<button class="'+(w.period===p?'on':'')+'" onclick="wizPeriod(\''+p+'\')">'+p+'</button>').join('')+'</div></div>';
+      '<div class="seg">'+['يومية','أسبوعية','شهرية'].map(p=>'<button class="'+(w.period===p?'on':'')+'" onclick="wizPeriod(\''+p+'\')">'+p+'</button>').join('')+'</div></div>'+
+      '<div class="card"><div class="row"><div class="ico">🔒</div><div class="grow"><p class="t-name">رقم سري لواجهة بابا وماما</p>'+
+      '<p class="t-sub">عشان الأطفال ما يدخلوش يعتمدوا لنفسهم 😉 — اختياري</p></div></div>'+
+      '<input class="inp" inputmode="numeric" maxlength="6" placeholder="مثال: 2124" style="margin-top:8px;text-align:center;letter-spacing:6px" oninput="wizPin(this.value)"></div>';
     foot=backBtn+nextBtn;
   }
   else if(w.step===4){
@@ -982,7 +1185,18 @@ function wizardHTML(){
 
 /* ---------- ceremony ---------- */
 function ceremonyHTML(){
-  const finalPts=Math.max(S.week,S.target)+5, bonus=Math.round(finalPts*S.bonusPct/100);
+  const real=S.ceremonyReal && S.lastClose;
+  const finalPts=real? S.lastClose.net : Math.max(S.week,S.target)+5;
+  const bonus=real? S.lastClose.bonus : Math.round(finalPts*S.bonusPct/100);
+  const hit=real? S.lastClose.hit : true;
+  if(real && !hit){
+    return '<div class="overlay"><div class="confetti" id="cfbox"></div>'+
+      '<div class="pop" style="font-size:56px">🌱</div><h2>فترة جديدة يا '+S.kidName+'!</h2>'+
+      '<p style="margin:0;opacity:.9;font-size:14px">جمعت '+finalPts+' من '+S.lastClose.target+' — قربت جدًا، والأسبوع الجديد فرصة جديدة</p>'+
+      '<div class="res"><div class="r"><span>راح للمحفظة</span><b class="num">+'+Math.max(0,finalPts)+'</b></div>'+
+      '<div class="r"><span>الهدف الجاي</span><b class="num">'+S.target+'</b></div></div>'+
+      '<button class="btn btn-gold" onclick="closeCeremony()">يلا نبدأ من جديد 💪</button></div>';
+  }
   const inner = S.cert
     ? '<div class="cert pop"><div style="font-size:30px">🏅</div><h3>شهادة كنز الأسبوع</h3>'+
       '<p>تُمنح إلى <b>'+S.kidName+'</b><br>لتحقيقه هدف الأسبوع بتفوق<br>وجمعه '+(finalPts+bonus)+' نقطة كاملة</p>'+
@@ -1015,12 +1229,21 @@ function render(){
       '<p class="lead">هاتفك متوصل بعائلة بالفعل.<br>تحب تسيبها وتنضم للعائلة اللي في الرابط؟</p></div>'+
       '<div class="wiz-foot"><button class="btn btn-ghost" style="flex:1;padding:12px 0" onclick="declineJoin()">لا، خليني في عائلتي</button>'+
       '<button class="btn btn-teal" style="flex:1;padding:12px 0" onclick="acceptJoin()">انضمام للجديدة</button></div></div>';
+  }else if(S.mode==='pin'){
+    html='<div class="wiz"><div class="wiz-body" style="text-align:center;padding-top:46px">'+
+      '<div style="font-size:50px">🔒</div><h2>واجهة بابا وماما</h2>'+
+      '<p class="lead">اكتب الرقم السري لولي الأمر</p>'+
+      '<input class="inp" id="pinInp" inputmode="numeric" maxlength="6" style="text-align:center;font-size:22px;letter-spacing:8px" placeholder="••••">'+
+      (S.pinErr?'<p class="small" style="color:var(--coral);font-weight:700;margin-top:8px">الرقم مش صح — جرب تاني</p>':'')+
+      '</div><div class="wiz-foot">'+
+      '<button class="btn btn-ghost" style="flex:0 0 auto;padding:12px 18px" onclick="S.mode=\'app\';S.pinErr=false;render()">→</button>'+
+      '<button class="btn btn-teal" style="flex:1" onclick="tryPin(document.getElementById(\'pinInp\').value)">دخول 🔓</button></div></div>';
   }else if(S.role==='child'){
     if(!S.features.stories && S.childTab==='stories') S.childTab='today';
     html = {today:childToday, wallet:childWallet, rewards:childRewards, stories:childStories}[S.childTab]();
     html = '<div class="body">'+html+'</div>'+childNav();
   }else{
-    html = {family:parentFamily, approve:parentApprove, reports:parentReports, settings:parentSettings}[S.parentTab]();
+    html = {family:parentFamily, approve:parentApprove, reports:parentReports, settings:parentSettings, deduct:parentDeduct}[S.parentTab]();
     html = '<div class="body">'+html+'</div>'+parentNav();
   }
   if(S.toast && S.mode!=='wizard' && S.mode!=='share'){

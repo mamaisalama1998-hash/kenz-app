@@ -653,7 +653,8 @@ function wUndo(){ const w=S.wiz;
   if(w.backups&&w.backups[w.ki]!==undefined){ w.sel[w.ki]=w.backups[w.ki]; delete w.backups[w.ki]; render() } }
 function wRw(id){ const r=S.wiz.rw.find(x=>x.id===id); r.on=!r.on; render() }
 function wRwCost(id,d){ const r=S.wiz.rw.find(x=>x.id===id); r.cost=Math.max(5,r.cost+d*5); render() }
-function wTarget(i,d){ S.wiz.targets[i]=Math.max(5,S.wiz.targets[i]+d*5); render() }
+function wTarget(i,d){ S.wiz.targets[i]=Math.max(5,Math.min(wPoss(i),S.wiz.targets[i]+d*5)); render() }
+function wSetTarget(i,v){ S.wiz.targets[i]=Math.max(5,Math.min(wPoss(i),v)); render() }
 function wBonus(d){ S.wiz.bonus=Math.min(50,Math.max(0,S.wiz.bonus+d*5)); render() }
 function wNext(){
   const w=S.wiz;
@@ -846,11 +847,35 @@ function wizardHTML(){
     foot=backB+nextB;
   }
   else if(w.step===6){
-    body=`<h2>🎯 ${t('targetTitle')}</h2><p class="lead">${t('targetSub')}</p>`+
-      w.kids.map((k,i)=>`<div class="card row"><div class="ico">${k.av}</div><div class="grow">
-        <p class="t-name">${k.name}</p><p class="t-sub num">${t('possible',periodWord())}: ${wPoss(i)}</p></div>
-        <div class="stepper"><button onclick="wTarget(${i},-1)">−</button><span class="v num">${w.targets[i]}</span><button onclick="wTarget(${i},1)">+</button></div></div>`).join('')+
-      `<div class="card row"><div class="ico">🏆</div><div class="grow"><p class="t-name">${t('bonusOnTarget')}</p></div>${stepperH('wBonus',w.bonus,'%')}</div>`;
+    body=`<h2>🎯 ${t('targetTitle')}</h2><p class="lead">${['الهدف = النقاط اللي لو وصلها الطفل يبقى كسب أسبوعه وياخد البونص. اختار مستوى جاهز أو عدّل بنفسك.','الهدف = النقاط التي إذا بلغها الطفل يكون قد أنجز فترته ونال المكافأة. اختر مستوى جاهزًا أو عدّل بنفسك.','The target is the score that wins the period and earns the bonus. Pick a level or fine-tune it.'][LI]}</p>`+
+      w.kids.map((k,i)=>{
+        const mx=wPoss(i), tg=w.targets[i], p=mx?Math.round(tg/mx*100):0, miss=Math.max(0,mx-tg);
+        const lvl = p<=65?['سهل','سهل','Easy'][LI] : (p<=80?['متوازن','متوازن','Balanced'][LI] : ['صعب','صعب','Hard'][LI]);
+        const col = p<=65?'var(--good)' : (p<=80?'var(--teal)' : 'var(--coral)');
+        return `<div class="card">
+          <div class="row"><div class="ico" style="font-size:22px">${k.av}</div><div class="grow">
+            <p class="t-name">${k.name}</p>
+            <p class="t-sub">${['أقصى نقاط ممكنة في','أقصى نقاط ممكنة في','Most points possible per'][LI]} ${periodWord()}: <b class="num">${mx}</b></p></div></div>
+          <div class="row" style="gap:6px;margin-top:10px">
+            ${[[65,['سهل','سهل','Easy']],[75,['متوازن','متوازن','Balanced']],[85,['صعب','صعب','Hard']]].map(o=>{
+              const val=Math.max(5,Math.round(mx*o[0]/100/5)*5);
+              return `<button class="btn ${tg===val?'btn-teal':'btn-ghost'} grow" style="font-size:12.5px" onclick="wSetTarget(${i},${val})">${o[1][LI]||o[1][1]}<br><span class="num" style="font-size:11px;opacity:.8">${val}</span></button>`;
+            }).join('')}
+          </div>
+          <div class="bar" style="margin-top:11px"><i style="width:${p}%"></i></div>
+          <div class="row" style="margin-top:9px;justify-content:space-between">
+            <div><p class="t-name num" style="font-size:15px">${tg} ${t('pts')} · ${p}%</p>
+            <p class="t-sub" style="color:${col};font-weight:700">${lvl}</p></div>
+            <div class="stepper"><button onclick="wTarget(${i},-1)">−</button><span class="v num">${tg}</span><button onclick="wTarget(${i},1)">+</button></div></div>
+          <p class="t-sub" style="margin-top:7px">${[`يعني يقدر يفوّت لحد ${miss} نقطة ويفضل محقق هدفه`,`أي يمكنه أن يفوّت حتى ${miss} نقطة ويظل محققًا لهدفه`,`So they can miss up to ${miss} points and still hit the target`][LI]}</p>
+        </div>`;
+      }).join('')+
+      `<div class="card"><div class="row"><div class="ico">🏆</div><div class="grow">
+        <p class="t-name">${t('bonusOnTarget')}</p>
+        <p class="t-sub">${['نقاط زيادة هدية لما يوصل لهدفه','نقاط إضافية عند بلوغ الهدف','Extra points for hitting the target'][LI]}</p></div>
+        ${stepperH('wBonus',w.bonus,'%')}</div>
+        <p class="t-sub" style="margin-top:8px">${w.kids.map((k,i)=>
+          [`${k.name}: +${Math.round(w.targets[i]*w.bonus/100)} ${t('pts')}`,`${k.name}: +${Math.round(w.targets[i]*w.bonus/100)} ${t('pts')}`,`${k.name}: +${Math.round(w.targets[i]*w.bonus/100)} ${t('pts')}`][LI]).join(' · ')}</p></div>`;
     foot=backB+nextB;
   }
   else{
@@ -1147,7 +1172,8 @@ function delTask(kidId,id){
   S.ui.delTask=null; if(tk)logIt(`🗑 ${nm(tk)} · ${k.name}`); render();
 }
 function bumpBeh(id,d){ const b=S.behaviors.find(x=>x.id===id); b.pts=Math.max(1,b.pts+d); render() }
-function bumpTargetK(kidId,d){ const k=kid(kidId); k.target=Math.max(5,k.target+d*5); render() }
+function bumpTargetK(kidId,d){ const k=kid(kidId); k.target=Math.max(5,Math.min(possible(k),k.target+d*5)); render() }
+function setTargetK(kidId,v){ const k=kid(kidId); k.target=Math.max(5,Math.min(possible(k),v)); render() }
 function bumpBonus(d){ S.bonusPct=Math.min(50,Math.max(0,S.bonusPct+d*5)); render() }
 function setPeriod(p){
   S.period=p;
@@ -1605,8 +1631,21 @@ function parentSettings(){
         ${k.usesApp?`<div class="row" style="margin-top:9px;gap:7px">
           <input class="inp" id="pin_${k.id}" inputmode="numeric" maxlength="6" placeholder="${k.pin?['غيّر الرقم','تغيير الرقم','Change PIN'][LI]:['حدد رقم','تعيين رقم','Set PIN'][LI]}" style="text-align:center;letter-spacing:6px">
           <button class="btn btn-teal" onclick="setKidPin('${k.id}',document.getElementById('pin_${k.id}').value)">🔑</button></div>`:''}
-        <div class="row" style="margin-top:9px;justify-content:space-between"><span class="lbl" style="margin:0">🎯 ${['الهدف','الهدف','Target'][LI]}</span>
-          <div class="stepper"><button onclick="bumpTargetK('${k.id}',-1)">−</button><span class="v num">${k.target}</span><button onclick="bumpTargetK('${k.id}',1)">+</button></div></div></div>`).join('')}</div>
+        ${(()=>{ const mx=possible(k), p=mx?Math.round(k.target/mx*100):0;
+          const lvl=p<=65?['سهل','سهل','Easy'][LI]:(p<=80?['متوازن','متوازن','Balanced'][LI]:['صعب','صعب','Hard'][LI]);
+          const col=p<=65?'var(--good)':(p<=80?'var(--teal)':'var(--coral)');
+          return `<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">
+            <div class="row" style="justify-content:space-between">
+              <div><span class="lbl" style="margin:0">🎯 ${['الهدف','الهدف','Target'][LI]}</span>
+              <p class="t-sub num">${k.target} ${['من','من','of'][LI]} ${mx} · ${p}% · <b style="color:${col}">${lvl}</b></p></div>
+              <div class="stepper"><button onclick="bumpTargetK('${k.id}',-1)">−</button><span class="v num">${k.target}</span><button onclick="bumpTargetK('${k.id}',1)">+</button></div></div>
+            <div class="bar" style="margin-top:8px"><i style="width:${Math.min(100,p)}%"></i></div>
+            <div class="row" style="gap:6px;margin-top:8px">
+              ${[[65,['سهل','سهل','Easy']],[75,['متوازن','متوازن','Balanced']],[85,['صعب','صعب','Hard']]].map(o=>{
+                const v=Math.max(5,Math.round(mx*o[0]/100/5)*5);
+                return `<button class="btn ${k.target===v?'btn-teal':'btn-ghost'} grow btn-sm" onclick="setTargetK('${k.id}',${v})">${o[1][LI]||o[1][1]} <span class="num">${v}</span></button>`}).join('')}
+            </div></div>`; })()}
+        </div>`).join('')}</div>
 
     <div class="sec"><p class="sec-t">📋 ${['المهام والنقاط','المهام والنقاط','Tasks & points'][LI]}</p>
       ${S.kids.length>1?`<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px">

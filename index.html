@@ -485,7 +485,7 @@ function syncChip(){
   const k=famToken?syncSt:'off'; el.textContent=(M[k]||M.off)[LI]||(M[k]||M.off)[1];
 }
 async function cloudCreate(){
-  syncSt='syncing'; syncChip();
+  syncSt='syncing'; syncChip(); rev=1;          // never publish at rev 0 — joiners compare revisions
   try{ const r=await fetch('https://www.npoint.io/documents',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:JSON.stringify(packS())})});
     const d=await r.json();
@@ -501,11 +501,11 @@ async function cloudPush(){
   syncChip(); save();
 }
 function queuePush(){ if(!famToken)return; clearTimeout(pushT); pushT=setTimeout(cloudPush,700) }
-async function cloudPull(){
+async function cloudPull(force){
   if(!famToken)return false;
   try{ const r=await fetch('https://api.npoint.io/'+famToken+'?_='+Date.now()); if(!r.ok)throw 0;
     const d=await r.json();
-    if((d.rev||0)>rev){ pulling=true; applyS(d); applyDir(); render(); pulling=false }
+    if(force||(d.rev||0)>rev){ pulling=true; applyS(d); applyDir(); render(); pulling=false }
     syncSt='ok'; syncChip(); save(); return true }
   catch(e){ syncSt='err'; syncChip(); return false }
 }
@@ -522,14 +522,30 @@ function copyLink(){ const x=famLink();
   else prompt(t('copyLink'),x) }
 function toast(m){ S.toast=m; render() }
 function joinFamily(v){
-  const m=(v||'').match(/[a-f0-9]{16,32}/i);
-  if(!m){ toast(['الرابط مش مظبوط','الرابط غير صحيح','Invalid link'][LI]); return }
-  famToken=m[0]; rev=0; save(); syncSt='syncing'; syncChip();
-  cloudPull().then(ok=>{ if(ok){ S.mode='switch'; startPoll(); toast('🎉 '+t('joinFam')) }
-    else{ famToken=null; save(); toast(['معرفناش نوصل للعيلة','تعذّر الوصول إلى العائلة','Could not reach that family'][LI]) } render() });
+  const raw=(v||'').trim();
+  if(!raw){ toast(['الصق رابط العيلة الأول','الصق رابط العائلة أولًا','Paste the family link first'][LI]); return }
+  const m=raw.match(/[a-f0-9]{16,32}/i);
+  if(!m){ toast(['الرابط ناقص — لازم يكون فيه ?fam=','الرابط ناقص — يجب أن يحتوي ?fam=','Link is missing its ?fam= part'][LI]); return }
+  const prev=famToken;
+  famToken=m[0]; rev=0; lastDeclined=null; unlocked=false; save();
+  syncSt='syncing'; syncChip(); toast(['🔄 بندوّر على العيلة…','🔄 جارٍ الاتصال بالعائلة…','🔄 Looking for that family…'][LI]);
+  cloudPull(true).then(ok=>{
+    if(ok&&S.kids&&S.kids.length){
+      S.mode='switch'; S.role='child'; startPoll();
+      toast(['🎉 اتوصلت بالعيلة!','🎉 تم الاتصال بالعائلة!','🎉 Connected to the family!'][LI]);
+    } else if(ok){
+      toast(['العيلة دي لسه فاضية — استنى صاحبها يخلص الإعداد','هذه العائلة فارغة — انتظر حتى يكتمل إعدادها','That family is still empty — wait until its setup is finished'][LI]);
+      famToken=prev; save();
+    } else {
+      famToken=prev; save();
+      toast(['مفيش نت أو الرابط غلط — جرب تاني','تعذّر الاتصال أو الرابط غير صحيح — أعد المحاولة','No connection or wrong link — try again'][LI]);
+    }
+    render();
+  });
 }
 function acceptJoin(){ famToken=S.pendingJoin; S.pendingJoin=null; lastDeclined=null; rev=0; unlocked=false; save();
-  cloudPull().then(()=>{ S.mode='switch'; startPoll(); render() }) }
+  cloudPull(true).then(ok=>{ S.mode=ok?'switch':'app'; if(ok)startPoll();
+    if(!ok)toast(['مفيش نت — جرب تاني','تعذّر الاتصال — أعد المحاولة','No connection — try again'][LI]); render() }) }
 function declineJoin(){ lastDeclined=S.pendingJoin; S.pendingJoin=null; S.mode='app'; save(); render();
   if(famToken){ cloudPull(); startPoll() } }
 
@@ -838,7 +854,8 @@ function rwForm(inWiz){
 }
 
 /* ================= profile switcher + PIN ================= */
-function goSwitch(){ S.mode='switch'; S.toast=null; if(S.parentPin) unlocked=false; save(); render() }
+function goSwitch(){ S.mode='switch'; S.toast=null; S.afterPin=null; S.pinErr=false; S.ui.joinOpen=false;
+  if(S.parentPin) unlocked=false; save(); render() }
 function pickKid(id){
   const k=kid(id); if(!k)return;
   if(k.pin){ S.mode='pin'; S.pinFor=id; S.pinErr=false; render(); return }
@@ -876,6 +893,13 @@ function switcherHTML(){
     ${S.kids.some(k=>!k.usesApp)?`<div class="card row" style="margin-top:14px;background:var(--chip);border:0">
       <div class="ico" style="background:var(--card)">✍️</div><p class="t-sub grow" style="margin:0">
       ${S.kids.filter(k=>!k.usesApp).map(k=>k.av+' '+k.name).join('، ')} — ${t('noAppKid')}</p></div>`:''}
+    <div style="text-align:center;margin-top:16px;border-top:1px dashed var(--line);padding-top:12px">
+      ${S.ui.joinOpen
+        ? `<input class="inp" id="joinSw" placeholder="${t('pasteLink')}" style="margin-bottom:8px">
+           <div class="row" style="gap:8px"><button class="btn btn-teal grow" onclick="joinFamily(document.getElementById('joinSw').value)">🔗 ${t('joinFam')}</button>
+           <button class="btn btn-ghost" onclick="S.ui.joinOpen=false;render()">${t('cancel')}</button></div>`
+        : `<button class="btn btn-ghost" style="font-size:12.5px" onclick="S.ui.joinOpen=true;render()">🔗 ${['عندك رابط عيلة تانية؟','لديك رابط عائلة أخرى؟','Have another family link?'][LI]}</button>`}
+    </div>
   </div></div>`;
 }
 function pinHTML(){
@@ -1610,7 +1634,12 @@ function parentSettings(){
         <div class="row" style="gap:8px"><button class="btn btn-teal grow" onclick="shareWa()">📲 ${['واتساب','واتساب','WhatsApp'][LI]}</button>
         <button class="btn btn-ghost grow" onclick="copyLink()">📋 ${['نسخ','نسخ','Copy'][LI]}</button></div></div>`
       :`<div class="card row"><div class="ico">📴</div><div class="grow"><p class="t-name">${['نسخة محلية','نسخة محلية','Local only'][LI]}</p></div>
-        <button class="btn btn-teal" onclick="cloudCreate().then(()=>render())">${['إنشاء','إنشاء','Create'][LI]}</button></div>`}</div>
+        <button class="btn btn-teal" onclick="cloudCreate().then(()=>render())">${['إنشاء','إنشاء','Create'][LI]}</button></div>`}
+      <div class="card"><div class="row"><div class="ico">🔗</div><div class="grow">
+        <p class="t-name">${['انضمام لعيلة تانية','الانضمام إلى عائلة أخرى','Join another family'][LI]}</p>
+        <p class="t-sub">${['الصق الرابط اللي وصلك — الموبايل ده هيتحول للعيلة دي','الصق الرابط الذي وصلك — سينتقل هذا الجهاز إلى تلك العائلة','Paste the link you received — this device moves to that family'][LI]}</p></div></div>
+        <input class="inp" id="joinSet" placeholder="${t('pasteLink')}" style="margin-top:9px">
+        <button class="btn btn-teal" style="width:100%;margin-top:8px" onclick="joinFamily(document.getElementById('joinSet').value)">🔗 ${t('joinFam')}</button></div></div>
 
     ${S.audit.length?`<div class="sec"><p class="sec-t">📜 ${['سجل العيلة','سجل العائلة','Family log'][LI]}</p>
       <div class="card">${S.audit.slice(0,12).map(a=>`<p class="t-sub" style="margin:0 0 6px">
@@ -1742,9 +1771,13 @@ if('serviceWorker' in navigator && location.protocol==='https:'){ try{ navigator
   LI=S.lang||0; applyDir(); lastSnap=snapNow();
   if(famQ&&!famToken){
     famToken=famQ; rev=0; save(); render();
-    cloudPull().then(ok=>{ if(ok){ S.mode='switch'; startPoll() } render() });
-  } else if(famQ&&famQ!==famToken&&famQ!==lastDeclined){
-    S.pendingJoin=famQ; S.mode='confirmJoin'; render();
+    cloudPull(true).then(ok=>{
+      if(ok&&S.kids.length){ S.mode='switch'; startPoll() }
+      else if(!ok){ famToken=null; save(); toast(['مفيش نت — افتح الرابط تاني','تعذّر الاتصال — افتح الرابط مجددًا','No connection — open the link again'][LI]) }
+      render();
+    });
+  } else if(famQ&&famQ!==famToken){
+    S.pendingJoin=famQ; S.mode='confirmJoin'; render();   // always re-offer; a declined link must not be blocked forever
   } else if(has&&S.kids.length){
     S.mode='switch'; render();
     if(famToken){ cloudPull(); startPoll() }

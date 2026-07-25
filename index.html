@@ -511,6 +511,12 @@ async function cloudPull(force){
   if(!famToken)return false;
   try{ const r=await fetch('https://api.npoint.io/'+famToken+'?_='+Date.now()); if(!r.ok)throw 0;
     const d=await r.json();
+    // SAFETY: a wiped record must never destroy a phone that still holds the family — heal it instead
+    if((!d.kids||!d.kids.length) && S.kids.length){
+      syncSt='ok'; syncChip();
+      rev=Math.max(rev,(d.rev||0))+1; cloudPush();
+      return true;
+    }
     if(force||(d.rev||0)>rev){ pulling=true; applyS(d); applyDir(); render(); pulling=false }
     syncSt='ok'; syncChip(); save(); return true }
   catch(e){ syncSt='err'; syncChip(); return false }

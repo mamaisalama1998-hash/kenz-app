@@ -364,11 +364,11 @@ const RW_SUGGEST=[
 const S={
   mode:'app', role:'parent', curKid:null, childTab:'today', parentTab:'family',
   lang:0, country:'EG', familyName:'', parentPin:'',
-  kids:[], rewards:[], rewardReqs:[], pending:[], audit:[],
+  kids:[], rewards:[], rewardReqs:[], pending:[], audit:[], moves:[],
   behaviors:[], notifs:[], followers:[], packs:[], features:{}, quest:{},
   period:'weekly', bonusPct:10, storyOpen:null, ui:{}
 };
-const SYNC=['lang','country','familyName','parentPin','kids','rewards','rewardReqs','pending','audit',
+const SYNC=['lang','country','familyName','parentPin','kids','rewards','rewardReqs','pending','audit','moves',
   'behaviors','notifs','followers','packs','features','quest','period','bonusPct'];
 
 function freshData(){
@@ -389,21 +389,58 @@ function freshData(){
     {id:'exams',  ico:'✏️',on:false,n:['باقة الامتحانات','باقة الامتحانات','Exams pack'],s:['مذاكرة مركزة ونوم بدري','مذاكرة مركزة ونوم مبكر','Focused study and early sleep']},
     {id:'summer', ico:'🏖️',on:false,n:['باقة الصيف','باقة الصيف','Summer pack'],s:['قراءة، رياضة، مهارة جديدة','قراءة، رياضة، مهارة جديدة','Reading, sport, a new skill']}
   ];
-  S.followers=[]; S.audit=[]; S.rewardReqs=[]; S.pending=[];
+  S.followers=[]; S.audit=[]; S.moves=[]; S.rewardReqs=[]; S.pending=[];
 }
+/* every point movement is recorded so a parent can reverse a mistake (PRD §26) */
+function addMove(kidId,kind,label,pts,ref){
+  S.moves.unshift({id:'m'+(seq++),kidId,kind,label,pts,ref:ref||{},t:stamp(),
+    by:(S.role==='child'?((cur()||{}).name||''):(myName||t('parent'))),undone:false});
+  if(S.moves.length>80) S.moves.pop();
+}
+function notify(kidId,text){
+  const k=kid(kidId); if(!k)return;
+  k.notices=k.notices||[]; k.notices.unshift({text,t:stamp()});
+  if(k.notices.length>4) k.notices.pop();
+}
+function clearNotices(kidId){ const k=kid(kidId); if(k)k.notices=[]; render() }
 function nm(o){ return o && o.n ? (o.n[LI]!==undefined?o.n[LI]:o.n[1]) : (o&&o.name)||'' }
 function sub(o){ return o && o.s ? (o.s[LI]!==undefined?o.s[LI]:o.s[1]) : '' }
 function freqLabel(w){ const f=FREQ.find(x=>x[3]===w); return f?(f[LI]!==undefined?f[LI]:f[1]):'' }
 function kid(id){ return S.kids.find(k=>k.id===id) }
 function cur(){ return kid(S.curKid)||S.kids[0] }
 function appKids(){ return S.kids.filter(k=>k.usesApp) }
-function periodF(){ return S.period==='daily'?(1/7):(S.period==='monthly'?4:1) }
-function capOf(x){ return Math.max(1,Math.round(x.w*periodF())) }
+function dToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
+function daysInPeriod(){ return S.period==='daily'?1:(S.period==='monthly'?28:7) }
+function normTask(x){                                   // migrate old {w} tasks
+  if(!x.kind){ if(x.w>=7){ x.kind='daily'; x.per=Math.max(1,Math.round(x.w/7)) } else { x.kind='period'; x.per=Math.max(1,x.w||1) } }
+  if(!x.per) x.per=1; return x;
+}
+function capOf(x){ normTask(x); return x.kind==='daily' ? x.per*daysInPeriod() : x.per }
+function dayCap(x){ normTask(x); return x.kind==='daily' ? x.per : 0 }
+function dayDoneOf(x){ return (x.day===dToday())?(x.dayDone||0):0 }
+function addDay(x){ const d=dToday(); if(x.day!==d){ x.day=d; x.dayDone=0 } x.dayDone=(x.dayDone||0)+1 }
+function subDay(x){ if(x.day===dToday()&&x.dayDone>0) x.dayDone-- }
+function freqText(x){
+  normTask(x);
+  const D=[['مرة في اليوم','مرة يوميًا','once a day'],['مرتين في اليوم','مرتان يوميًا','twice a day'],
+    ['٣ مرات في اليوم','٣ مرات يوميًا','3× a day'],['٤ مرات في اليوم','٤ مرات يوميًا','4× a day'],
+    ['٥ مرات في اليوم','٥ مرات يوميًا','5× a day']];
+  const P=[['مرة في الفترة','مرة في الفترة','once a period'],['مرتين في الفترة','مرتان في الفترة','twice a period'],
+    ['٣ مرات في الفترة','٣ مرات في الفترة','3× a period'],['٤ مرات في الفترة','٤ مرات في الفترة','4× a period'],
+    ['٥ مرات في الفترة','٥ مرات في الفترة','5× a period']];
+  const L=(x.kind==='daily'?D:P)[Math.min(4,Math.max(1,x.per))-1];
+  return L[LI]||L[1];
+}
 function possible(k){ return (k.tasks||[]).reduce((a,x)=>a+x.pts*capOf(x),0) }
 function doneOf(x){ return x.done||0 }
 function pendOf(id){ return S.pending.filter(p=>p.kidId===id) }
 function pendCountTask(kidId,taskId){ return S.pending.filter(p=>p.kidId===kidId&&p.taskId===taskId).length }
-function leftOf(kidId,x){ return capOf(x)-doneOf(x)-pendCountTask(kidId,x.id) }
+function pendToday(kidId,taskId){ return S.pending.filter(p=>p.kidId===kidId&&p.taskId===taskId&&p.day===dToday()).length }
+function leftOf(kidId,x){                                // how many more may be sent right now
+  const periodLeft=capOf(x)-doneOf(x)-pendCountTask(kidId,x.id);
+  if(x.kind!=='daily') return periodLeft;
+  return Math.min(periodLeft, dayCap(x)-dayDoneOf(x)-pendToday(kidId,x.id));
+}
 function pendPts(id){ return pendOf(id).reduce((a,p)=>a+p.pts,0) }
 function heldOf(id){ return S.rewardReqs.filter(r=>r.kidId===id&&r.st==='asked').reduce((a,r)=>{const w=S.rewards.find(x=>x.id===r.rwId);return a+(w?w.cost:0)},0) }
 function availOf(k){ return Math.max(0,k.wallet-heldOf(k.id)) }
@@ -499,29 +536,30 @@ function declineJoin(){ lastDeclined=S.pendingJoin; S.pendingJoin=null; S.mode='
 /* ================= suggestions ================= */
 function suggestFor(age,rel){
   const A=[];
-  const P=(id,ico,pts,w,n)=>({id,ico,pts,w,n,on:true});
+  const Dy=(id,ico,pts,per,n)=>({id,ico,pts,kind:'daily',per,n,on:true});   // resets every morning
+  const Pr=(id,ico,pts,per,n)=>({id,ico,pts,kind:'period',per,n,on:true});  // any day in the period
   if(age<5){
-    A.push(P('teeth','🦷',2,14,['غسل السنان','تنظيف الأسنان','Brush teeth']),
-      P('toys','🧸',3,7,['ترتيب اللعب','ترتيب الألعاب','Tidy the toys']),
-      P('polite','😊',2,7,['كلام مهذب','كلمات مهذبة','Polite words']),
-      P('help','🤝',3,3,['يساعد ماما','مساعدة الوالدين','Help mom or dad']),
-      P('sleep','🌙',2,7,['ينام بدري','النوم مبكرًا','Sleep on time']));
+    A.push(Dy('teeth','🦷',2,2,['غسل السنان','تنظيف الأسنان','Brush teeth']),
+      Dy('toys','🧸',3,1,['ترتيب اللعب','ترتيب الألعاب','Tidy the toys']),
+      Dy('polite','😊',2,1,['كلام مهذب','كلمات مهذبة','Polite words']),
+      Pr('help','🤝',3,3,['يساعد ماما','مساعدة الوالدين','Help mom or dad']),
+      Dy('sleep','🌙',2,1,['ينام بدري','النوم مبكرًا','Sleep on time']));
   }else if(age<=10){
-    if(rel) A.push(P('pray','🕌',2,35,['الصلاة','الصلاة','Prayers']),P('quran','📖',5,7,['ورد القرآن','ورد القرآن','Quran reading']));
-    A.push(P('teeth','🦷',2,14,['غسل السنان','تنظيف الأسنان','Brush teeth']),
-      P('hw','📚',5,5,['الواجب','الواجب المدرسي','Homework']),
-      P('sport','⚽',10,2,['التمرين','التمرين الرياضي','Sports practice']),
-      P('family','🏡',3,3,['يساعد في البيت','المساعدة في المنزل','Help at home']),
-      P('sibling','💛',2,7,['معاملة حلوة مع الأخوات','حسن معاملة الإخوة','Kind to siblings']),
-      P('room','🛏️',4,3,['ترتيب الأوضة','ترتيب الغرفة','Tidy the room']));
+    if(rel) A.push(Dy('pray','🕌',2,5,['الصلاة','الصلاة','Prayers']),Dy('quran','📖',5,1,['ورد القرآن','ورد القرآن','Quran reading']));
+    A.push(Dy('teeth','🦷',2,2,['غسل السنان','تنظيف الأسنان','Brush teeth']),
+      Pr('hw','📚',5,5,['الواجب','الواجب المدرسي','Homework']),
+      Pr('sport','⚽',10,2,['التمرين','التمرين الرياضي','Sports practice']),
+      Pr('family','🏡',3,3,['يساعد في البيت','المساعدة في المنزل','Help at home']),
+      Dy('sibling','💛',2,1,['معاملة حلوة مع الأخوات','حسن معاملة الإخوة','Kind to siblings']),
+      Pr('room','🛏️',4,3,['ترتيب الأوضة','ترتيب الغرفة','Tidy the room']));
   }else{
-    if(rel) A.push(P('pray','🕌',2,35,['الصلاة','الصلاة','Prayers']),P('quran','📖',5,7,['ورد القرآن','ورد القرآن','Quran reading']));
-    A.push(P('study','📚',5,5,['المذاكرة','المذاكرة','Study']),
-      P('sport','🏀',10,2,['الرياضة','الرياضة','Sport']),
-      P('chore','🧹',4,3,['مسؤولية في البيت','مسؤولية منزلية','Home responsibility']),
-      P('time','⏰',3,7,['ينام ويصحى في معاده','الالتزام بمواعيد النوم','Sleep & wake on time']),
-      P('skill','🎨',5,2,['يطور مهارة','تطوير مهارة','Build a skill']),
-      P('others','🤲',3,2,['يساعد غيره','مساعدة الآخرين','Help others']));
+    if(rel) A.push(Dy('pray','🕌',2,5,['الصلاة','الصلاة','Prayers']),Dy('quran','📖',5,1,['ورد القرآن','ورد القرآن','Quran reading']));
+    A.push(Pr('study','📚',5,5,['المذاكرة','المذاكرة','Study']),
+      Pr('sport','🏀',10,2,['الرياضة','الرياضة','Sport']),
+      Pr('chore','🧹',4,3,['مسؤولية في البيت','مسؤولية منزلية','Home responsibility']),
+      Dy('time','⏰',3,1,['ينام ويصحى في معاده','الالتزام بمواعيد النوم','Sleep & wake on time']),
+      Pr('skill','🎨',5,2,['يطور مهارة','تطوير مهارة','Build a skill']),
+      Pr('others','🤲',3,2,['يساعد غيره','مساعدة الآخرين','Help others']));
   }
   return A;
 }
@@ -562,7 +600,9 @@ function wBuild(i){ const w=S.wiz,k=w.kids[i];
   if(w.touched&&w.touched[i]) return;               // never silently wipe the parent's edits
   if(w.selAge[i]!==k.age||w.selRel!==w.religious){ w.sel[i]=suggestFor(k.age,w.religious); w.selAge[i]=k.age } }
 function wTouch(){ const w=S.wiz; w.touched=w.touched||{}; w.touched[w.ki]=true }
-function wPoss(i){ return (S.wiz.sel[i]||[]).filter(x=>x.on).reduce((a,x)=>a+x.pts*Math.max(1,Math.round(x.w*periodF())),0) }
+function wPoss(i){ return (S.wiz.sel[i]||[]).filter(x=>x.on).reduce((a,x)=>a+x.pts*capOf(x),0) }
+function wKind(id,k){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.kind=k; wTouch(); render() }
+function wPer(id,d){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.per=Math.min(5,Math.max(1,(x.per||1)+d)); wTouch(); render() }
 function wItem(id){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.on=!x.on; wTouch(); render() }
 function wBump(id,d){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); wTouch(); render() }
 function wDelItem(id){ const w=S.wiz; w.sel[w.ki]=w.sel[w.ki].filter(a=>a.id!==id); wTouch(); render() }
@@ -609,8 +649,9 @@ function wFinish(){
   S.rewards=w.rw.filter(r=>r.on).map(r=>({id:r.id,ico:r.ico,cost:r.cost,n:r.n}));
   S.kids=w.kids.map((k,i)=>({
     id:'k'+(i+1),name:k.name.trim(),age:k.age,g:k.g,av:k.av,usesApp:k.usesApp,pin:k.pin,
-    tasks:(w.sel[i]||[]).filter(x=>x.on).map(x=>({id:x.id,ico:x.ico,pts:x.pts,w:x.w,n:x.n,
-      done:0, type:x.id==='pray'?'prayer':undefined})),
+    tasks:(w.sel[i]||[]).filter(x=>x.on).map(x=>({id:x.id,ico:x.ico,pts:x.pts,kind:x.kind,per:x.per,n:x.n,
+      done:0, dayDone:0, type:x.id==='pray'?'prayer':undefined})),
+    notices:[],
     target:w.targets[i]||30, week:0, wallet:0, lvl:1, deductions:[], achievements:[], goalRw:null, lastClose:null
   }));
   unlocked=true; S.role='parent'; S.parentTab='family'; S.curKid=S.kids[0].id;
@@ -624,16 +665,18 @@ function stepperH(fn,val,suf){ return `<div class="stepper"><button onclick="${f
 function toggleH(on,fn,label){ return `<button class="toggle${on?' on':''}" onclick="${fn}" aria-label="${label||''}"></button>` }
 
 /* custom task form (shared: wizard + settings) */
-const tf={on:false,name:'',ico:'⭐',pts:3,w:7};
-function tfOpen(){ Object.assign(tf,{on:true,name:'',ico:'⭐',pts:3,w:7}); render() }
+const tf={on:false,name:'',ico:'⭐',pts:3,kind:'daily',per:1};
+function tfOpen(){ Object.assign(tf,{on:true,name:'',ico:'⭐',pts:3,kind:'daily',per:1}); render() }
 function tfName(v){ tf.name=v } function tfIco(i){ tf.ico=i; render() }
-function tfPts(d){ tf.pts=Math.max(1,tf.pts+d); render() } function tfW(w){ tf.w=w; render() }
+function tfPts(d){ tf.pts=Math.max(1,tf.pts+d); render() }
+function tfKind(k){ tf.kind=k; render() }
+function tfPer(d){ tf.per=Math.min(5,Math.max(1,tf.per+d)); render() }
 function tfSave(){
   if(!tf.name.trim()){ toast(['اكتب اسم المهمة الأول','أدخل اسم المهمة أولًا','Enter a task name first'][LI]); return }
   const nme=tf.name.trim();
-  const item={id:'c'+(seq++),ico:tf.ico,pts:tf.pts,w:tf.w,n:[nme,nme,nme]};
-  if(S.mode==='wizard'){ S.wiz.sel[S.wiz.ki].push({...item,on:true}) }
-  else { const k=kid(S.ui.taskKid)||cur(); k.tasks.push({...item,st:'open'}); logIt(`+ ${nme} → ${k.name}`) }
+  const item={id:'c'+(seq++),ico:tf.ico,pts:tf.pts,kind:tf.kind,per:tf.per,n:[nme,nme,nme]};
+  if(S.mode==='wizard'){ S.wiz.sel[S.wiz.ki].push({...item,on:true}); wTouch() }
+  else { const k=kid(S.ui.taskKid)||cur(); k.tasks.push({...item,done:0,dayDone:0}); logIt(`+ ${nme} → ${k.name}`) }
   tf.on=false; render();
 }
 function tfForm(){
@@ -645,7 +688,10 @@ function tfForm(){
     <div class="row" style="flex-wrap:wrap;gap:6px">${TF_ICONS.map(i=>`<button class="btn ${tf.ico===i?'btn-gold':'btn-ghost'}" style="padding:7px 10px;font-size:17px" onclick="tfIco('${i}')">${i}</button>`).join('')}</div>
     <div class="row" style="margin-top:12px;justify-content:space-between"><span class="lbl" style="margin:0">${t('points')}</span>${stepperH('tfPts','+'+tf.pts)}</div>
     <label class="lbl" style="margin-top:10px">${t('repeat')}</label>
-    <div class="row" style="flex-wrap:wrap;gap:6px">${FREQ.map(f=>`<button class="btn ${tf.w===f[3]?'btn-teal':'btn-ghost'}" style="padding:7px 10px;font-size:11.5px" onclick="tfW(${f[3]})">${f[LI]||f[1]}</button>`).join('')}</div>
+    <div class="seg" style="width:100%;margin-bottom:8px">
+      <button class="${tf.kind==='daily'?'on':''}" style="flex:1" onclick="tfKind('daily')">${['يومية — تتجدد كل صباح','يومية — تتجدد كل صباح','Daily — resets each morning'][LI]}</button>
+      <button class="${tf.kind!=='daily'?'on':''}" style="flex:1" onclick="tfKind('period')">${['في الفترة — أي يوم','في الفترة — أي يوم','Per period — any day'][LI]}</button></div>
+    <div class="row" style="justify-content:space-between"><span class="lbl" style="margin:0">${tf.kind==='daily'?['مرات في اليوم','مرات في اليوم','Times per day'][LI]:['مرات في الفترة','مرات في الفترة','Times per period'][LI]}</span>${stepperH('tfPer','×'+tf.per)}</div>
     <div class="row" style="margin-top:14px;gap:8px"><button class="btn btn-teal grow" onclick="tfSave()">${t('save')} ✓</button>
     <button class="btn btn-ghost" onclick="tf.on=false;render()">${t('cancel')}</button></div></div>`;
 }
@@ -723,12 +769,17 @@ function wizardHTML(){
         : `<button class="btn btn-gold" style="font-size:12px" onclick="wCopy(${j})">📋 ${t('sameAs',kk.name)}</button>`).join('')}
       ${w.backup?`<button class="btn btn-ghost" style="font-size:12px" onclick="wUndo()">↩ ${t('undoCopy')}</button>`:''}</div>`:'';
     body=`<h2>${k.av} ${t('tasksFor',k.name)}</h2><p class="lead">${t('tasksSub',k.age)}</p>${copy}`+
-      sel.map(x=>`<div class="card row" style="${x.on?'':'opacity:.55'}">
-        <button class="cbx${x.on?' on':''}" onclick="wItem('${x.id}')" aria-label="${nm(x)}">${x.on?'✓':''}</button>
+      sel.map(x=>`<div class="card" style="${x.on?'':'opacity:.55'}">
+        <div class="row"><button class="cbx${x.on?' on':''}" onclick="wItem('${x.id}')" aria-label="${nm(x)}">${x.on?'✓':''}</button>
         <div class="ico">${x.ico}</div><div class="grow"><p class="t-name" style="font-size:13.5px">${nm(x)}</p>
-        <p class="t-sub">${freqLabel(x.w)} · ${['أقصى','بحد أقصى','max'][LI]} ${Math.max(1,Math.round(x.w*periodF()))} × ${x.pts}</p></div>
-        <button class="del-x" onclick="wDelItem('${x.id}')">✕</button>
-        <div class="stepper"><button onclick="wBump('${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="wBump('${x.id}',1)">+</button></div></div>`).join('')+
+        <p class="t-sub">${freqText(x)} · ${['المجموع','المجموع','total'][LI]} <b class="num">${capOf(x)*x.pts}</b></p></div>
+        <button class="del-x" onclick="wDelItem('${x.id}')">✕</button></div>
+        <div class="row" style="margin-top:8px;gap:7px;flex-wrap:wrap;justify-content:space-between">
+          <div class="seg"><button class="${x.kind==='daily'?'on':''}" onclick="wKind('${x.id}','daily')">${['يومية','يومية','Daily'][LI]}</button><button class="${x.kind!=='daily'?'on':''}" onclick="wKind('${x.id}','period')">${['في الفترة','في الفترة','Per period'][LI]}</button></div>
+          <div class="row" style="gap:7px">
+            <div class="stepper"><button onclick="wPer('${x.id}',-1)">−</button><span class="v num">×${x.per}</span><button onclick="wPer('${x.id}',1)">+</button></div>
+            <div class="stepper"><button onclick="wBump('${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="wBump('${x.id}',1)">+</button></div>
+          </div></div></div>`).join('')+
       tfForm()+
       `<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 ${t('possibleWeek',wPoss(w.ki))}</p></div>`;
     foot=backB+`<button class="btn btn-teal" onclick="wNext()">${w.ki<w.kids.length-1?(LI===2?'Next child →':'الطفل التالي ←'):t('next')+' ←'}</button>`;
@@ -862,8 +913,8 @@ function submitTask(kidId,taskId){
   const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk)return;
   if(leftOf(kidId,tk)<=0)return;
   delete tk.rej;
-  const label = tk.type==='prayer' ? prayLabel((doneOf(tk)+pendCountTask(kidId,taskId))%5) : tk.n;
-  S.pending.push({id:'q'+(seq++),kidId,taskId,pts:tk.pts,ico:tk.ico,n:label});
+  const label = tk.type==='prayer' ? prayLabel((dayDoneOf(tk)+pendToday(kidId,taskId))%5) : tk.n;
+  S.pending.push({id:'q'+(seq++),kidId,taskId,pts:tk.pts,ico:tk.ico,n:label,day:dToday()});
   if(S.role==='child') logIt(`📨 ${nm({n:label})} · ${k.name}`);
   render();
 }
@@ -873,7 +924,8 @@ function approve(id){
   const p=S.pending[i]; S.pending.splice(i,1);
   const k=kid(p.kidId); if(!k)return;
   k.week+=p.pts; S.quest.prog=Math.min(S.quest.total,S.quest.prog+p.pts);
-  const tk=k.tasks.find(x=>x.id===p.taskId); if(tk){ tk.done=doneOf(tk)+1; delete tk.rej }
+  const tk=k.tasks.find(x=>x.id===p.taskId); if(tk){ tk.done=doneOf(tk)+1; if(tk.kind==='daily')addDay(tk); delete tk.rej }
+  addMove(p.kidId,'approve',nm(p),p.pts,{taskId:p.taskId});
   logIt(`✓ ${nm(p)} · ${k.name} +${p.pts}`);
   toast(`✓ ${nm(p)} +${p.pts}`);
 }
@@ -883,6 +935,7 @@ function rejectWith(id,reason){
   const p=S.pending[i]; S.pending.splice(i,1); S.ui.rejecting=null;
   const k=kid(p.kidId); const tk=k&&k.tasks.find(x=>x.id===p.taskId);
   if(tk) tk.rej=reason;
+  addMove(p.kidId,'reject',nm(p),0,{taskId:p.taskId,pts:p.pts,ico:p.ico,n:p.n,day:p.day,reason});
   logIt(`✕ ${nm(p)} · ${k?k.name:''} — ${reason}`);
   toast(`✕ ${reason}`);
 }
@@ -892,21 +945,61 @@ function retry(kidId,taskId){ const k=kid(kidId),tk=k.tasks.find(x=>x.id===taskI
 function parentRecord(kidId,taskId){
   const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk)return;
   if(doneOf(tk)>=capOf(tk))return;
+  if(tk.kind==='daily'&&dayDoneOf(tk)>=dayCap(tk)){
+    toast([`خلص نصيب النهارده (${dayCap(tk)}) — بكرة تاني`,`اكتمل نصيب اليوم (${dayCap(tk)}) — غدًا مجددًا`,`Today’s ${dayCap(tk)} are done — again tomorrow`][LI]); return }
   const i=S.pending.findIndex(p=>p.kidId===kidId&&p.taskId===taskId);
   if(i>=0) S.pending.splice(i,1);
-  tk.done=doneOf(tk)+1; delete tk.rej; k.week+=tk.pts;
+  tk.done=doneOf(tk)+1; if(tk.kind==='daily')addDay(tk); delete tk.rej; k.week+=tk.pts;
   S.quest.prog=Math.min(S.quest.total,S.quest.prog+tk.pts);
+  addMove(kidId,'approve',nm(tk),tk.pts,{taskId});
   logIt(`✓ ${nm(tk)} · ${k.name} +${tk.pts}`); render();
 }
 function parentUndo(kidId,taskId){
   const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk||doneOf(tk)<=0)return;
-  tk.done=doneOf(tk)-1; k.week-=tk.pts; S.quest.prog=Math.max(0,S.quest.prog-tk.pts);
+  tk.done=doneOf(tk)-1; if(tk.kind==='daily')subDay(tk);
+  k.week-=tk.pts; S.quest.prog=Math.max(0,S.quest.prog-tk.pts);
+  const mv=S.moves.find(m=>m.kidId===kidId&&m.kind==='approve'&&!m.undone&&m.ref&&m.ref.taskId===taskId);
+  if(mv) mv.undone=true;
+  notify(kidId,[`اتشال اعتماد «${nm(tk)}» −${tk.pts}`,`أُلغي اعتماد «${nm(tk)}» −${tk.pts}`,`“${nm(tk)}” approval removed −${tk.pts}`][LI]);
   logIt(`↩ ${nm(tk)} · ${k.name}`); render();
+}
+
+/* ---- reverse any recent movement (PRD §26: open period only, always logged) ---- */
+function undoMove(id){
+  const m=S.moves.find(x=>x.id===id); if(!m||m.undone)return;
+  const k=kid(m.kidId); if(!k)return;
+  if(m.kind==='approve'){
+    const tk=k.tasks.find(x=>x.id===m.ref.taskId);
+    if(tk&&doneOf(tk)>0){ tk.done=doneOf(tk)-1; if(tk.kind==='daily')subDay(tk) }
+    k.week-=m.pts; S.quest.prog=Math.max(0,S.quest.prog-m.pts);
+    notify(m.kidId,[`اتشال اعتماد «${m.label}» −${m.pts}`,`أُلغي اعتماد «${m.label}» −${m.pts}`,`“${m.label}” approval removed −${m.pts}`][LI]);
+  }
+  else if(m.kind==='reject'){
+    const tk=k.tasks.find(x=>x.id===m.ref.taskId); if(tk)delete tk.rej;
+    S.pending.push({id:'q'+(seq++),kidId:m.kidId,taskId:m.ref.taskId,pts:m.ref.pts,ico:m.ref.ico,n:m.ref.n,day:m.ref.day||dToday()});
+    notify(m.kidId,[`بابا وماما رجّعوا «${m.label}» للمراجعة تاني 👍`,`أُعيد «${m.label}» إلى المراجعة 👍`,`“${m.label}” was sent back for review 👍`][LI]);
+  }
+  else if(m.kind==='deduct'){
+    k.week+=m.pts;
+    const d=(k.deductions||[]).find(x=>x.id===m.ref.dedId);
+    if(d) k.deductions=k.deductions.filter(x=>x.id!==m.ref.dedId);
+    notify(m.kidId,[`اتشال خصم «${m.label}» +${m.pts} رجعوا لك 🎉`,`أُلغي خصم «${m.label}» وأُعيدت ${m.pts} 🎉`,`“${m.label}” deduction removed, +${m.pts} back 🎉`][LI]);
+  }
+  else if(m.kind==='bonus'){
+    k.week-=m.pts;
+    if(m.ref.medal) k.achievements=(k.achievements||[]).filter(a=>nm(a)!==m.label);
+    notify(m.kidId,[`اتعدلت مكافأة «${m.label}» −${m.pts}`,`عُدّلت مكافأة «${m.label}» −${m.pts}`,`“${m.label}” reward corrected −${m.pts}`][LI]);
+  }
+  m.undone=true;
+  logIt(`↩ ${['تراجع عن','تراجع عن','undid'][LI]} ${m.label} · ${k.name}`);
+  toast(['↩ اتصححت','↩ تم التصحيح','↩ Corrected'][LI]);
 }
 function doDeduct(kidId,bid){
   const k=kid(kidId), b=S.behaviors.find(x=>x.id===bid); if(!b)return;
   k.week-=b.pts;
-  k.deductions.push({id:'d'+(seq++),ico:b.ico,pts:b.pts,n:b.n,st:'active',appeal:null});
+  const did='d'+(seq++);
+  k.deductions.push({id:did,ico:b.ico,pts:b.pts,n:b.n,st:'active',appeal:null});
+  addMove(kidId,'deduct',nm(b),b.pts,{dedId:did});
   logIt(`➖ ${nm(b)} · ${k.name} −${b.pts}`);
   S.ui.panel=null; toast(`➖ ${nm(b)} −${b.pts}`);
 }
@@ -954,6 +1047,7 @@ function exSave(kidId){
   const k=kid(kidId), nme=exf.name.trim()||['إنجاز مميز','إنجاز مميز','Special achievement'][LI];
   k.week+=exf.pts;
   if(exf.medal) k.achievements.push({ico:'🏅',pts:exf.pts,n:[nme,nme,nme]});
+  addMove(kidId,'bonus',nme,exf.pts,{medal:exf.medal});
   logIt(`⭐ ${nme} · ${k.name} +${exf.pts}`);
   S.ui.panel=null; toast(`⭐ +${exf.pts} — ${nme}`);
 }
@@ -966,9 +1060,10 @@ function closePeriod(kidId){
   if(net>0) k.wallet+=net+bonus;
   if(hit) k.lvl=(k.lvl||1)+1;
   k.lastClose={net,bonus,hit,target:k.target};
-  k.week=0; k.deductions=[];
-  k.tasks.forEach(x=>{ x.done=0; delete x.rej });
+  k.week=0; k.deductions=[]; k.notices=[];
+  k.tasks.forEach(x=>{ x.done=0; x.dayDone=0; delete x.day; delete x.rej });
   S.pending=S.pending.filter(p=>p.kidId!==kidId);
+  S.moves=S.moves.filter(m=>m.kidId!==kidId);      // closed period → no more direct undo (PRD §26)
   logIt(`🏁 ${k.name} — ${net}/${k.lastClose.target}${hit?' 🏆':''}`);
   S.ui.panel=null; S.ui.closing=null;
   S.ceremonyKid=kidId; S.ceremonyReal=true; S.ceremony=true; S.cert=false; render();
@@ -984,6 +1079,8 @@ function confetti(){
 }
 /* settings mutations */
 function bumpTask(kidId,id,d){ const k=kid(kidId),x=k.tasks.find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); render() }
+function setKind(kidId,id,kind){ const k=kid(kidId),x=k.tasks.find(a=>a.id===id); normTask(x); x.kind=kind; render() }
+function bumpPer(kidId,id,d){ const k=kid(kidId),x=k.tasks.find(a=>a.id===id); normTask(x); x.per=Math.min(5,Math.max(1,x.per+d)); render() }
 function delTask(kidId,id){
   if(S.ui.delTask!==kidId+id){ S.ui.delTask=kidId+id; render(); return }
   const k=kid(kidId), tk=k.tasks.find(a=>a.id===id);
@@ -1047,36 +1144,45 @@ function mascotBlock(k){ return S.features.mascot
   ? `<div class="side-el">${mascotSVG(k,60)}<div class="mascot-chip">${['كنزي','كنزي','Kenzi'][LI]} · ${['مستوى','مستوى','Lv'][LI]} ${k.lvl||1}</div></div>` : '' }
 
 function taskRow(k,x,parentMode){
-  const cap=capOf(x), dn=doneOf(x), pn=pendCountTask(k.id,x.id), left=cap-dn-pn;
+  normTask(x);
+  const cap=capOf(x), dn=doneOf(x), pn=pendCountTask(k.id,x.id), left=leftOf(k.id,x);
+  const isDaily=x.kind==='daily', dCap=dayCap(x), dDone=dayDoneOf(x), dPend=pendToday(k.id,x.id);
+  const dayFull=isDaily&&(dDone+dPend)>=dCap;
   const allDone=dn>=cap;
-  const counter=`<span class="num">${dn}/${cap}</span>`;
+  const counter=isDaily
+    ? `<span class="num">${['النهارده','اليوم','today'][LI]} ${dDone}/${dCap}</span> · <span class="num muted">${['الفترة','الفترة','period'][LI]} ${dn}/${cap}</span>`
+    : `<span class="num">${dn}/${cap}</span>`;
   const rej=x.rej?`<p class="t-sub" style="color:var(--coral)">${['السبب','السبب','Reason'][LI]}: ${x.rej}</p>`:'';
+  const doneToday=isDaily&&dDone>=dCap;
 
   if(x.type==='prayer'){
-    const inCycle=allDone?5:((dn+pn)%5||((dn+pn)>0&&(dn+pn)%5===0?5:0));
-    let b=''; for(let i=0;i<5;i++) b+=`<span class="bead${i<inCycle?' on':''}"></span>`;
+    let b=''; for(let i=0;i<5;i++) b+=`<span class="bead${i<(dDone+dPend)?' on':''}"></span>`;
     const act=parentMode
-      ? `<div class="row" style="gap:5px">${dn>0?`<button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','${x.id}')">↩</button>`:''}
-         ${allDone?`<span class="stamp ok">✓</span>`:`<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','${x.id}')">+1 ✓</button>`}</div>`
-      : (allDone?`<span class="stamp ok">${['ما شاء الله ✓','ما شاء الله ✓','Mashallah ✓'][LI]}</span>`
+      ? `<div class="row" style="gap:5px">${dDone>0?`<button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','${x.id}')">↩</button>`:''}
+         ${doneToday?`<span class="stamp ok">✓</span>`:`<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','${x.id}')">+1 ✓</button>`}</div>`
+      : (doneToday?`<span class="stamp ok">${['ما شاء الله ✓','ما شاء الله ✓','Mashallah ✓'][LI]}</span>`
         : left<=0?`<span class="stamp">${['مستني بابا ⏳','بانتظار الاعتماد ⏳','Waiting ⏳'][LI]}</span>`
         :`<button class="btn btn-teal" onclick="prayBead('${k.id}')">${['صليت ✓','صليت ✓','Prayed ✓'][LI]}</button>`);
     return `<div class="card row"><div class="ico">🕌</div><div class="grow">
-      <p class="t-name">${nm(x)} <span class="t-sub">${counter}</span></p><div class="beads">${b}</div>${rej}</div>${act}</div>`;
+      <p class="t-name">${nm(x)}</p><div class="beads">${b}</div>
+      <p class="t-sub">${counter}</p>${rej}</div>${act}</div>`;
   }
   let act;
   if(parentMode){
     act=`<div class="row" style="gap:5px">${dn>0?`<button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','${x.id}')">↩</button>`:''}
-      ${allDone?`<span class="stamp ok num">✓ ${dn}/${cap}</span>`
+      ${(allDone||dayFull)?`<span class="stamp ok num">✓</span>`
         :`<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','${x.id}')">${['سجّلها ✓','سجّلها ✓','Record ✓'][LI]}</button>`}</div>`;
   } else {
     if(allDone) act=`<span class="stamp ok num">✓ ${dn}/${cap}</span>`;
+    else if(doneToday) act=`<span class="stamp ok">${['خلصت النهارده ✓','اكتمل اليوم ✓','Done today ✓'][LI]}</span>`;
     else if(left<=0) act=`<span class="stamp">${['مستني بابا ⏳','بانتظار الاعتماد ⏳','Waiting ⏳'][LI]}</span>`;
     else if(x.rej) act=`<button class="btn btn-coral" onclick="submitTask('${k.id}','${x.id}')">${['حاول تاني ↻','حاول مجددًا ↻','Try again ↻'][LI]}</button>`;
     else act=`<button class="btn btn-teal" onclick="submitTask('${k.id}','${x.id}')">${t('done')} ✓</button>`;
   }
   return `<div class="card row"><div class="ico">${x.ico}</div><div class="grow">
-    <p class="t-name">${nm(x)}</p><p class="t-sub"><b>+${x.pts}</b> · ${freqLabel(x.w)} · ${counter}${pn?` · +${pn} ⏳`:''}</p>${rej}</div>${act}</div>`;
+    <p class="t-name">${nm(x)}${isDaily?'':` <span class="stamp" style="padding:2px 7px;font-size:10px">${['أي يوم','أي يوم','any day'][LI]}</span>`}</p>
+    <p class="t-sub"><b>+${x.pts}</b> · ${freqText(x)}</p>
+    <p class="t-sub">${counter}${pn?` · +${pn} ⏳`:''}</p>${rej}</div>${act}</div>`;
 }
 
 function childToday(){
@@ -1101,6 +1207,13 @@ function childToday(){
       <div class="grow"><p class="t-name">${['مهمة العيلة','مهمة العائلة','Family quest'][LI]}: ${nm(S.quest)}</p>
       <div class="bar" style="margin-top:6px"><i style="width:${pct(S.quest.prog,S.quest.total)}%;background:linear-gradient(90deg,#F4B93C,#FFD98A)"></i></div>
       <p class="t-sub" style="margin-top:5px">${['كل العيلة جمعت','جمعت العائلة','The family collected'][LI]} <b>${S.quest.prog}</b> / ${S.quest.total} 🤝</p></div></div></div>`:''}
+
+    ${(k.notices||[]).length?`<div class="sec">
+      <div class="card" style="border-color:var(--gold-deep);background:var(--chip)">
+        <div class="row"><div class="ico" style="background:var(--card)">💬</div><div class="grow">
+        <p class="t-name" style="font-size:13.5px">${['رسالة من بابا وماما','رسالة من والديك','A note from your parents'][LI]}</p>
+        ${k.notices.map(n=>`<p class="t-sub">• ${n.text}</p>`).join('')}</div>
+        <button class="btn btn-ghost btn-sm" onclick="clearNotices('${k.id}')">${['تمام','حسنًا','OK'][LI]}</button></div></div></div>`:''}
 
     <div class="sec"><p class="sec-t">${['مهامي','مهامي','My tasks'][LI]}</p>
     ${k.tasks.filter(x=>S.features.religious||x.type!=='prayer').length
@@ -1248,6 +1361,25 @@ function panelFor(k){
         <button class="btn btn-coral btn-sm" onclick="doDeduct('${k.id}','${b.id}')">${['سجّل','تسجيل','Record'][LI]}</button></div>`).join('')}
       <button class="btn btn-ghost" style="width:100%" onclick="S.ui.panel=null;render()">${['اقفل','إغلاق','Close'][LI]}</button></div>`;
   }
+  if(p==='moves'){
+    const ms=S.moves.filter(m=>m.kidId===k.id).slice(0,10);
+    const KIND={approve:['اعتماد','اعتماد','Approved'],reject:['رفض','رفض','Rejected'],
+      deduct:['خصم','خصم','Deduction'],bonus:['مكافأة','مكافأة','Reward']};
+    return `<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+      <p class="sec-t" style="margin:0 0 8px">↩ ${['آخر الحركات — صحّح أي غلطة','آخر الحركات — صحّح أي خطأ','Recent activity — fix any mistake'][LI]}</p>
+      <div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">
+        ${['التراجع بيتسجل في سجل العيلة و'+k.name+' هيشوف إن في تصحيح — عشان ماحدش يحس إن نقطه ضاعت.',
+           'التراجع يُسجَّل في سجل العائلة وسيرى '+k.name+' أن هناك تصحيحًا — حتى لا يشعر بضياع نقاطه.',
+           'Undo is logged, and '+k.name+' is told about the correction — so points never seem to vanish.'][LI]}</p></div>
+      ${ms.length?ms.map(m=>`<div class="card row" style="${m.undone?'opacity:.5':''}">
+        <div class="ico" style="font-size:17px">${m.kind==='approve'?'✓':m.kind==='reject'?'✕':m.kind==='deduct'?'➖':'⭐'}</div>
+        <div class="grow"><p class="t-name" style="font-size:13px">${m.label}</p>
+        <p class="t-sub">${KIND[m.kind][LI]||KIND[m.kind][1]} · ${m.by} · ${m.t}${m.pts?` · ${m.kind==='deduct'?'−':'+'}${m.pts}`:''}</p></div>
+        ${m.undone?`<span class="stamp">${['اتصحح','صُحّح','fixed'][LI]}</span>`
+          :`<button class="btn btn-ghost btn-sm" onclick="undoMove('${m.id}')">↩ ${['تراجع','تراجع','Undo'][LI]}</button>`}</div>`).join('')
+        :`<div class="card" style="text-align:center;padding:18px"><p class="t-sub" style="margin:0">${['مفيش حركات لسه','لا توجد حركات بعد','No activity yet'][LI]}</p></div>`}
+      <button class="btn btn-ghost" style="width:100%" onclick="S.ui.panel=null;render()">${['اقفل','إغلاق','Close'][LI]}</button></div>`;
+  }
   if(p==='ex'){
     return `<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
       <p class="sec-t" style="margin:0 0 8px">⭐ ${['مكافأة استثنائية','مكافأة استثنائية','Special reward'][LI]}</p>
@@ -1280,6 +1412,7 @@ function parentFamily(){
           <button class="btn btn-teal btn-sm" onclick="S.ui.panel='record';S.ui.panelKid='${k.id}';render()">✍️ ${['سجّل إنجاز','تسجيل إنجاز','Record task'][LI]}</button>
           <button class="btn btn-coral btn-sm" onclick="S.ui.panel='deduct';S.ui.panelKid='${k.id}';render()">➖ ${['خصم','خصم','Deduct'][LI]}</button>
           <button class="btn btn-gold btn-sm" onclick="exOpen('${k.id}')">⭐ ${['مكافأة','مكافأة','Reward'][LI]}</button>
+          <button class="btn btn-ghost btn-sm" onclick="S.ui.panel='moves';S.ui.panelKid='${k.id}';render()">↩ ${['صحّح','تصحيح','Fix'][LI]}</button>
           ${S.ui.closing===k.id
             ? `<button class="btn btn-teal btn-sm" onclick="closePeriod('${k.id}')">${['متأكد — أغلق ✓','تأكيد الإغلاق ✓','Confirm close ✓'][LI]}</button>
                <button class="btn btn-ghost btn-sm" onclick="S.ui.closing=null;render()">${t('cancel')}</button>`
@@ -1420,12 +1553,19 @@ function parentSettings(){
     <div class="sec"><p class="sec-t">📋 ${['المهام والنقاط','المهام والنقاط','Tasks & points'][LI]}</p>
       ${S.kids.length>1?`<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px">
         ${S.kids.map(x=>`<button class="btn ${x.id===tk.id?'btn-teal':'btn-ghost'} btn-sm" onclick="S.ui.taskKid='${x.id}';render()">${x.av} ${x.name}</button>`).join('')}</div></div>`:''}
-      ${tk.tasks.map(x=>`<div class="card row"><div class="ico">${x.ico}</div><div class="grow">
-        <p class="t-name" style="font-size:13.5px">${nm(x)}</p><p class="t-sub">${freqLabel(x.w)} · ${['أقصى','بحد أقصى','max'][LI]} ${capOf(x)} × ${x.pts} = <b class="num">${capOf(x)*x.pts}</b></p></div>
-        <div class="stepper"><button onclick="bumpTask('${tk.id}','${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="bumpTask('${tk.id}','${x.id}',1)">+</button></div>
+      ${tk.tasks.map(x=>`<div class="card">
+        <div class="row"><div class="ico">${x.ico}</div><div class="grow">
+        <p class="t-name" style="font-size:13.5px">${nm(x)}</p>
+        <p class="t-sub">${freqText(x)} · ${capOf(x)} × ${x.pts} = <b class="num">${capOf(x)*x.pts}</b></p></div>
         ${S.ui.delTask===tk.id+x.id
           ? `<button class="btn btn-coral btn-sm" onclick="delTask('${tk.id}','${x.id}')">${['متأكد؟','تأكيد','Sure?'][LI]}</button>`
-          : `<button class="del-x" onclick="delTask('${tk.id}','${x.id}')">✕</button>`}</div>`).join('')}
+          : `<button class="del-x" onclick="delTask('${tk.id}','${x.id}')">✕</button>`}</div>
+        <div class="row" style="margin-top:8px;gap:7px;flex-wrap:wrap;justify-content:space-between">
+          <div class="seg"><button class="${x.kind==='daily'?'on':''}" onclick="setKind('${tk.id}','${x.id}','daily')">${['يومية','يومية','Daily'][LI]}</button><button class="${x.kind!=='daily'?'on':''}" onclick="setKind('${tk.id}','${x.id}','period')">${['في الفترة','في الفترة','Per period'][LI]}</button></div>
+          <div class="row" style="gap:7px">
+            <div class="stepper"><button onclick="bumpPer('${tk.id}','${x.id}',-1)">−</button><span class="v num">×${x.per}</span><button onclick="bumpPer('${tk.id}','${x.id}',1)">+</button></div>
+            <div class="stepper"><button onclick="bumpTask('${tk.id}','${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="bumpTask('${tk.id}','${x.id}',1)">+</button></div>
+          </div></div></div>`).join('')}
       <div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">
         💡 ${['مجموع الممكن لـ'+tk.name,'مجموع الممكن لـ'+tk.name,'Total possible for '+tk.name][LI]}: <b class="num">${possible(tk)}</b>
         · ${['الهدف','الهدف','target'][LI]} <b class="num">${tk.target}</b>

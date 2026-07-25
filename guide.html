@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>كنز — دليل البداية</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B6763">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --teal:#159A92; --teal-deep:#0B6763; --gold:#F4B93C; --gold-deep:#C98D0E;
+    --coral:#E4614F; --violet:#5E60CE; --ink:#22404C; --soft:#5E7986;
+    --ground:#FFF7EC; --card:#FFFFFF; --line:#EFE0C9; --chip:#E6F5F3; --good:#2FA05A;
+    --shadow:0 10px 26px rgba(35,65,77,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#EAF2F0; --soft:#9DB4AE; --ground:#101E1D; --card:#1A2C2A;
+      --line:#294240; --chip:#173734; --gold:#FFCB55; --gold-deep:#FFCB55; --coral:#FF8B7D;
+      --shadow:0 10px 26px rgba(0,0,0,.4); }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.8;font-size:16px}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 16px 64px}
+  a{color:var(--teal-deep);font-weight:700}
+  @media (prefers-color-scheme: dark){ a{color:var(--gold)} }
+
+  header{text-align:center;padding:12px 0 6px}
+  header h1{margin:10px 0 2px;font-size:29px;font-weight:800}
+  header p{margin:0;color:var(--soft);font-size:14.5px}
+
+  h2{font-size:20px;margin:38px 0 4px;display:flex;align-items:center;gap:9px}
+  h2 .n{width:30px;height:30px;border-radius:10px;background:var(--teal);color:#fff;
+    display:grid;place-items:center;font-size:14px;font-weight:800;flex:0 0 auto}
+  .sub{color:var(--soft);font-size:14px;margin:0 0 14px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:15px 17px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .card p{margin:0}
+  .card p+p{margin-top:6px}
+
+  /* ---- animated loop ---- */
+  .loop{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px 14px;
+    box-shadow:var(--shadow);overflow-x:auto}
+  .loop-track{display:flex;gap:8px;align-items:stretch;min-width:520px}
+  .node{flex:1;background:var(--chip);border-radius:14px;padding:11px 9px;text-align:center;
+    position:relative;opacity:.45}
+  .node .e{font-size:24px;display:block}
+  .node b{font-size:12.5px;display:block;margin-top:3px}
+  .node span{font-size:11px;color:var(--soft);display:block;line-height:1.5}
+  @media (prefers-reduced-motion: no-preference){
+    .node{animation:pulse 7.5s infinite}
+    .node:nth-child(1){animation-delay:0s}.node:nth-child(2){animation-delay:1.5s}
+    .node:nth-child(3){animation-delay:3s}.node:nth-child(4){animation-delay:4.5s}
+    .node:nth-child(5){animation-delay:6s}
+    @keyframes pulse{0%,80%,100%{opacity:.45;transform:none}
+      6%,18%{opacity:1;transform:translateY(-4px);box-shadow:0 6px 16px rgba(21,154,146,.28)}}
+  }
+  @media (prefers-reduced-motion: reduce){ .node{opacity:1} }
+
+  /* ---- phone mockups ---- */
+  .shot{width:236px;flex:0 0 auto;background:var(--card);border:1px solid var(--line);
+    border-radius:24px;padding:7px;box-shadow:var(--shadow)}
+  .screen{border-radius:18px;overflow:hidden;background:var(--ground);border:1px solid var(--line)}
+  .hero-s{background:linear-gradient(160deg,var(--teal),var(--teal-deep));color:#fff;padding:11px 12px 26px}
+  .hero-s.par{background:linear-gradient(160deg,#2E5A6B,#1B3A47)}
+  .hero-s .hi{font-size:9.5px;opacity:.85;margin:0}
+  .hero-s h4{margin:2px 0 0;font-size:13px}
+  .float{margin:-18px 9px 0;background:var(--card);border:1px solid var(--line);
+    border-radius:13px;padding:9px 10px}
+  .mini{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:7px 9px;margin:7px 9px;display:flex;align-items:center;gap:8px}
+  .mini .ic{width:26px;height:26px;border-radius:9px;background:var(--chip);display:grid;
+    place-items:center;font-size:13px;flex:0 0 auto}
+  .mini .tx{flex:1;min-width:0}
+  .mini .tx b{font-size:10.5px;display:block}
+  .mini .tx i{font-size:9px;color:var(--soft);font-style:normal;display:block}
+  .pill{background:var(--teal);color:#fff;border-radius:99px;padding:4px 9px;font-size:9.5px;font-weight:700;flex:0 0 auto}
+  .pill.g{background:var(--gold);color:#5B4300}
+  .pill.q{background:var(--chip);color:var(--teal-deep)}
+  @media (prefers-color-scheme: dark){ .pill.q{color:var(--gold)} }
+  .bar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;margin-top:5px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-deep),var(--gold))}
+  .cap{font-size:12.5px;color:var(--soft);text-align:center;margin:8px 0 0}
+
+  .pair{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;justify-content:center;margin:14px 0}
+  .pair .side{flex:1;min-width:210px}
+  .pair .side h3{margin:0 0 4px;font-size:15.5px}
+  .pair .side p{margin:0;font-size:14px;color:var(--soft)}
+
+  .q{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 16px;margin-bottom:9px}
+  .q b{display:block;font-size:15px;margin-bottom:3px}
+  .q span{font-size:14px;color:var(--soft)}
+
+  .tip{background:var(--chip);border:1px solid var(--line);border-radius:16px;padding:13px 16px;margin:12px 0;font-size:14.5px}
+  .warn{background:#FFF3F0;border:1px solid #F5C9C0;color:#8A2F20;border-radius:16px;padding:13px 16px;margin:12px 0;font-size:14.5px}
+  @media (prefers-color-scheme: dark){ .warn{background:#3A211D;border-color:#5A322B;color:#FFB4A8} }
+
+  .cta{display:block;text-align:center;background:var(--teal);color:#fff;border-radius:16px;
+    padding:15px;font-size:17px;font-weight:800;text-decoration:none;margin:26px 0 0}
+  footer{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);
+    color:var(--soft);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <svg width="62" height="62" viewBox="0 0 512 512" aria-hidden="true">
+    <rect width="512" height="512" rx="118" fill="#0B6763"/>
+    <circle cx="256" cy="506" r="318" fill="#159A92"/>
+    <circle cx="92" cy="116" r="14" fill="#FFDA7A"/><circle cx="424" cy="104" r="17" fill="#FFDA7A"/>
+    <rect x="96" y="250" width="320" height="166" rx="34" fill="#F4B93C"/>
+    <rect x="86" y="166" width="340" height="104" rx="38" fill="#FFD86D"/>
+    <rect x="96" y="254" width="320" height="32" rx="10" fill="#DD9C16"/>
+    <circle cx="198" cy="334" r="18" fill="#23414D"/><circle cx="314" cy="334" r="18" fill="#23414D"/>
+    <path d="M208 368q32 30 64 30t32-30" fill="none" stroke="#23414D" stroke-width="14" stroke-linecap="round"/>
+    <rect x="234" y="248" width="44" height="56" rx="15" fill="#25B3AA"/>
+  </svg>
+  <h1>دليل البداية</h1>
+  <p>اقرأه في ٥ دقايق قبل ما تبدأ — هيوفر عليك كل الأسئلة</p>
+</header>
+
+<h2><span class="n">١</span> الفكرة في سطر واحد</h2>
+<div class="card">
+  <p>الطفل بيعمل مهامه، بابا أو ماما بيوافقوا، فيكسب <b>نقاط</b>. لما يوصل <b>هدف الفترة</b> ياخد <b>بونص</b>، والنقاط بتتحول لـ<b>محفظة</b> يشتري بيها <b>مكافآت</b> انتوا اخترتوها.</p>
+</div>
+
+<div class="loop">
+  <div class="loop-track">
+    <div class="node"><span class="e">🙋</span><b>الطفل يعمل</b><span>يدوس «تم ✓»</span></div>
+    <div class="node"><span class="e">✅</span><b>الأهل يوافقوا</b><span>مفيش نقطة من غير موافقة</span></div>
+    <div class="node"><span class="e">⭐</span><b>النقاط تزيد</b><span>ناحية هدف الفترة</span></div>
+    <div class="node"><span class="e">🏆</span><b>يحقق الهدف</b><span>ياخد بونص</span></div>
+    <div class="node"><span class="e">🎁</span><b>يصرف من كنزه</b><span>مكافأة اخترتوها</span></div>
+  </div>
+</div>
+<p class="cap">الدورة دي بتتكرر كل فترة (يوم أو أسبوع — انتوا تختاروا)</p>
+
+<h2><span class="n">٢</span> الشاشتين الأساسيتين</h2>
+<p class="sub">التطبيق فيه واجهتين: واحدة للطفل وواحدة لبابا وماما، وبتبدلوا بينهم بزرار <b>🔄 بدّل</b> فوق.</p>
+
+<div class="pair">
+  <div class="shot" aria-label="شاشة الطفل">
+    <div class="screen">
+      <div class="hero-s"><p class="hi">صباح الخير 👋</p><h4>يا بطل، كنزك بيكبر النهارده</h4></div>
+      <div class="float">
+        <div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:var(--soft);font-weight:700">هدف الأسبوع</span><b>62 / 90</b></div>
+        <div class="bar"><i style="width:69%"></i></div>
+        <p style="font-size:9px;color:var(--soft);margin:5px 0 0">باقي 28 نقطة والبونص 10% مستنيك 🌟</p>
+      </div>
+      <div class="mini"><div class="ic">🕌</div><div class="tx"><b>الصلاة</b><i>النهارده 3/5</i></div><span class="pill">صليت ✓</span></div>
+      <div class="mini"><div class="ic">📚</div><div class="tx"><b>الواجب</b><i>+5 · 2/5</i></div><span class="pill">تم ✓</span></div>
+      <div class="mini"><div class="ic">🛏️</div><div class="tx"><b>ترتيب الأوضة</b><i>أي يوم · 1/3</i></div><span class="pill q">مستني بابا ⏳</span></div>
+      <div style="height:8px"></div>
+    </div>
+  </div>
+  <div class="side">
+    <h3>👦 واجهة الطفل</h3>
+    <p>بيشوف مهامه، ويدوس «تم ✓» لما يخلّص. النقطة <b>ما بتتحسبش</b> غير لما تعتمدوها انتوا — فالطلب بيفضل «مستني بابا ⏳».</p>
+    <p style="margin-top:8px">الأرقام تحت كل مهمة بتقول: <b>النهارده كام</b> و<b>الفترة كام</b>.</p>
+  </div>
+</div>
+
+<div class="pair">
+  <div class="shot" aria-label="شاشة ولي الأمر">
+    <div class="screen">
+      <div class="hero-s par"><p class="hi">لوحة العيلة</p><h4>عائلة سلامة 👨‍👩‍👧‍👦</h4></div>
+      <div class="float" style="display:flex;align-items:center;gap:7px">
+        <div class="ic" style="width:24px;height:24px;border-radius:8px;background:var(--chip);display:grid;place-items:center;font-size:12px">⏳</div>
+        <div style="flex:1"><b style="font-size:10.5px">3 حاجات مستنياك</b></div><span class="pill">راجع</span>
+      </div>
+      <div class="mini" style="display:block">
+        <div style="display:flex;align-items:center;gap:8px"><div class="ic">🦊</div>
+          <div class="tx"><b>حمزة · 8 سنوات</b><i>62 / 90 · 💰 145</i></div><span class="pill q">69%</span></div>
+        <div class="bar"><i style="width:69%"></i></div>
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          <span class="pill" style="font-size:8.5px">✍️ سجّل إنجاز</span>
+          <span class="pill" style="font-size:8.5px;background:#FFEDEA;color:#B3402F">➖ خصم</span>
+          <span class="pill g" style="font-size:8.5px">⭐ مكافأة</span>
+          <span class="pill q" style="font-size:8.5px">↩ صحّح</span>
+        </div>
+      </div>
+      <div style="height:8px"></div>
+    </div>
+  </div>
+  <div class="side">
+    <h3>🧔 واجهة بابا وماما</h3>
+    <p>كارت لكل طفل، وتحته ٤ أزرار مهمة:</p>
+    <p style="margin-top:6px"><b>✍️ سجّل إنجاز</b> — تسجّل بنفسك بدل الطفل (لازم لو مامعهوش موبايل).<br>
+    <b>➖ خصم</b> — تسجّل سلوك، والطفل يشوف السبب ويقدر يعترض.<br>
+    <b>⭐ مكافأة</b> — نقاط زيادة لحاجة حلوة مش في القايمة.<br>
+    <b>↩ صحّح</b> — تتراجع عن أي حاجة عملتها بالغلط.</p>
+  </div>
+</div>
+
+<h2><span class="n">٣</span> المفاهيم اللي بتلخبط (اقرأها كويس)</h2>
+
+<div class="card">
+  <p><b>🔁 مهمة «كل يوم» ولا «في الأسبوع»؟</b></p>
+  <p><b>كل يوم:</b> بتتجدد كل صباح. مثال: غسل السنان مرتين كل يوم — لو عملها النهارده، بكرة تبدأ من جديد.</p>
+  <p><b>في الأسبوع:</b> يعملها في أي يوم. مثال: التمرين مرتين في الأسبوع — سواء الاتنين والخميس أو أي يومين.</p>
+  <p style="color:var(--soft);font-size:13.5px">التطبيق بيمنع الطفل يخلّص مهام الأسبوع كلها في يوم واحد — دي فايدة النوع «كل يوم».</p>
+</div>
+
+<div class="card">
+  <p><b>🎯 الهدف: سهل ولا متوازن ولا صعب؟</b></p>
+  <p>التطبيق بيحسب <b>أقصى نقاط ممكنة</b> من مهام الطفل، وبيديك ٣ أزرار جاهزة. أول أسبوع اختار <b>متوازن</b> (٧٥٪) أو حتى <b>سهل</b>.</p>
+  <p style="color:var(--soft);font-size:13.5px">القاعدة: أسبوع أول سهل يكسبه الطفل = أسبوع تاني هيحبه. هدف صعب من البداية بيخلّيه يسيب التطبيق.</p>
+</div>
+
+<div class="card">
+  <p><b>💰 ليه المحفظة صفر والنقاط بتزيد؟</b></p>
+  <p>نقاط الفترة بتفضل في العداد فوق لحد ما تقفلوا الفترة (🏁)، وساعتها بتنزل <b>المحفظة</b> ومعاها البونص. المحفظة هي بس اللي بيشتري بيها مكافآت.</p>
+  <p style="color:var(--soft);font-size:13.5px">أول أسبوع الطفل هيشوف «كمّل ادخار 💪» على المكافآت — ده طبيعي لحد أول إغلاق.</p>
+</div>
+
+<div class="card">
+  <p><b>⚖️ الخصم والاعتراض</b></p>
+  <p>لما تسجّل خصم، الطفل بيشوف <b>السبب والقيمة</b>، ومن حقه يبعت اعتراض مكتوب. انتوا تقرروا: <b>تثبيت</b> أو <b>تخفيض النص</b> أو <b>شيل الخصم</b>.</p>
+  <p style="color:var(--soft);font-size:13.5px">الخصم بيأثر على نقاط الفترة بس — <b>عمره ما بياخد من المحفظة</b> اللي الطفل ادّخرها.</p>
+</div>
+
+<h2><span class="n">٤</span> الإعداد — ٧ خطوات</h2>
+<p class="sub">واحد بس من بابا أو ماما يعمل الإعداد. الباقي ينضموا بالرابط.</p>
+
+<div class="q"><b>١ · الدولة واللغة واسم العيلة</b><span>اختار مصر → اللغة تتظبط لوحدها. لو وصلك رابط عيلة، الصقه هنا بدل ما تعمل إعداد جديد.</span></div>
+<div class="q"><b>٢ · الأطفال</b><span>الاسم، السن، ولد/بنت، وشخصية يختارها الطفل. لو الطفل معاهوش موبايل، اقفل التوجل وانتوا هتسجلوا له. اللي معاه موبايل لازم رقم سري ٤ أرقام.</span></div>
+<div class="q"><b>٣ · القيم والحماية</b><span>المحتوى الديني اختياري. اختار نحسب النقاط كل يوم ولا كل أسبوع. وحدد رقم سري لبابا وماما (غير أرقام الأطفال).</span></div>
+<div class="q"><b>٤ · المهام</b><span>اقتراحات حسب سن كل طفل. <b>خلّيها ٤ أو ٥ بس أول أسبوع.</b> فيه زرار ينسخ مهام أخ لأخيه.</span></div>
+<div class="q"><b>٥ · المكافآت</b><span>اختار من ١٠ اقتراحات أو ضيف بتاعك. <b>التطبيق مش هيوعد الطفل بأي حاجة انت ما اخترتهاش.</b> ومهمة العيلة المشتركة اختيارية.</span></div>
+<div class="q"><b>٦ · الهدف والبونص</b><span>٣ أزرار: سهل / متوازن / صعب. والبونص بيظهر بالنقاط الحقيقية لكل طفل.</span></div>
+<div class="q"><b>٧ · رابط العيلة</b><span>ابعته واتساب لباقي الموبايلات. كل واحد يفتحه <b>من كروم</b> وينضم.</span></div>
+
+<div class="warn">
+  <b>مهم جدًا:</b> الإعداد يتعمل <b>مرة واحدة على موبايل واحد</b>. باقي الموبايلات تنضم بالرابط.
+  لو أي موبايل ظهرت له شاشة الإعداد من تاني — دوس <b>🔄 استرجع عيلتي</b>، متعملش إعداد جديد.
+</div>
+
+<h2><span class="n">٥</span> أسئلة بتتسأل كتير</h2>
+<div class="q"><b>الطفل يقدر يوافق لنفسه؟</b><span>لأ. واجهة بابا وماما مقفولة برقم سري، وبتتقفل تاني أول ما تبدّل لحساب طفل.</span></div>
+<div class="q"><b>موبايل واحد لطفلين؟</b><span>عادي. زرار 🔄 بدّل → كل واحد يختار صورته ويكتب رقمه. مفيش تسجيل خروج.</span></div>
+<div class="q"><b>طفل مامعهوش موبايل خالص؟</b><span>شغّال ١٠٠٪ — انتوا تسجّلوا له من «✍️ سجّل إنجاز»، وليه نقاط ومحفظة ومكافآت زي إخواته.</span></div>
+<div class="q"><b>وافقت بالغلط، أعمل إيه؟</b><span>زرار <b>↩ صحّح</b> في كارت الطفل — بيرجّع أي حركة، وبيتسجل في سجل العيلة، والطفل بيوصله إن في تصحيح.</span></div>
+<div class="q"><b>مهمة الطفل ما اتعملتش، أخصم؟</b><span>لأ. عدم عمل المهمة = مفيش نقاط وبس. الخصم للسلوك السلبي فقط.</span></div>
+<div class="q"><b>هل فيه إشعارات؟</b><span>لسه لأ في النسخة التجريبية — لازم تفتح التطبيق. جاي في النسخة النهائية.</span></div>
+<div class="q"><b>الحكايات بتدي نقاط؟</b><span>لأ، عن قصد — عشان القراءة تفضل متعة مش شغل.</span></div>
+
+<h2><span class="n">٦</span> ٥ نصايح من التجارب</h2>
+<div class="card">
+  <p>١ · <b>ابدأ بـ٤ مهام</b> لكل طفل، وزوّد بعد أسبوع.</p>
+  <p>٢ · <b>وافق بسرعة</b> — الانتظار الطويل بيقتل الحماس.</p>
+  <p>٣ · <b>أول أسبوع من غير خصومات</b> خالص.</p>
+  <p>٤ · حط <b>مكافأة رخيصة</b> (٢٠–٣٠ نقطة) عشان ياخدها بدري ويصدّق النظام.</p>
+  <p>٥ · <b>اقفل الفترة والأولاد قاعدين معاك</b> — شاشة الاحتفال والشهادة أحلى لحظة في التطبيق.</p>
+</div>
+
+<a class="cta" href="./">افتح كنز وابدأ 🚀</a>
+<footer>كنز · نسخة تجريبية — كل حاجة هنا بتتطور بملاحظاتكم 💛</footer>
+</div>
+</body>
+</html>

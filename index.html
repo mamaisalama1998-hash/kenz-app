@@ -527,6 +527,11 @@ function startPoll(){ if(pollT||!famToken)return;
 function snapNow(){ const o={seq:seq}; SYNC.forEach(k=>o[k]=S[k]); return JSON.stringify(o) }
 function maybeSync(){ const s=snapNow(); if(s!==lastSnap){ lastSnap=s; if(!pulling)queuePush() } }
 function famLink(){ return location.origin+location.pathname+'?fam='+famToken }
+function shareGuide(){
+  const url=location.origin+location.pathname.replace(/[^/]*$/,'')+'guide.html';
+  const m=['📖 دليل البداية لتطبيق كنز','📖 دليل البداية لتطبيق كنز','📖 Kenz getting-started guide'][LI];
+  window.open('https://wa.me/?text='+encodeURIComponent(m+'\n'+url),'_blank');
+}
 function shareWa(){ const msgs=['انضموا لعيلتنا في تطبيق كنز 💰🎉','انضموا إلى عائلتنا في تطبيق كنز 💰🎉','Join our family on Kenz 💰🎉'];
   window.open('https://wa.me/?text='+encodeURIComponent((msgs[LI]||msgs[1])+'\n'+famLink()),'_blank') }
 function copyLink(){ const x=famLink();
@@ -759,7 +764,8 @@ function wizardHTML(){
       <rect x="96" y="250" width="320" height="166" rx="34" fill="#F4B93C"/><rect x="86" y="166" width="340" height="104" rx="38" fill="#FFD86D"/>
       <rect x="96" y="254" width="320" height="32" rx="10" fill="#DD9C16"/><circle cx="198" cy="334" r="18" fill="#23414D"/><circle cx="314" cy="334" r="18" fill="#23414D"/>
       <path d="M208 368q32 30 64 30t32-30" fill="none" stroke="#23414D" stroke-width="14" stroke-linecap="round"/><rect x="234" y="248" width="44" height="56" rx="15" fill="#25B3AA"/></svg>
-      <h2>${t('welcome')}</h2><p class="lead">${t('welcomeSub')}</p></div>
+      <h2>${t('welcome')}</h2><p class="lead">${t('welcomeSub')}</p>
+      <a href="guide.html" target="_blank" rel="noopener" class="btn btn-gold" style="display:inline-block;text-decoration:none">📖 ${['اقرأ دليل البداية (٥ دقايق)','اقرأ دليل البداية (٥ دقائق)','Read the 5-minute guide'][LI]}</a></div>
       <label class="lbl">${t('country')}</label>
       <select class="sel" style="width:100%" onchange="wCountry(this.value)">
         ${COUNTRIES.map(c=>`<option value="${c.c}"${w.country===c.c?' selected':''}>${LI===2?c.en:c.ar}</option>`).join('')}
@@ -1798,6 +1804,12 @@ function parentSettings(){
     ${S.audit.length?`<div class="sec"><p class="sec-t">📜 ${['سجل العيلة','سجل العائلة','Family log'][LI]}</p>
       <div class="card">${S.audit.slice(0,12).map(a=>`<p class="t-sub" style="margin:0 0 6px">
         <span class="num">${a.t}</span> · <b>${a.who}</b> · ${a.w}</p>`).join('')}</div></div>`:''}
+
+    <div class="sec"><p class="sec-t">📖 ${['المساعدة','المساعدة','Help'][LI]}</p>
+      <div class="card row"><div class="ico">📖</div><div class="grow"><p class="t-name">${['دليل البداية','دليل البداية','Getting-started guide'][LI]}</p><p class="t-sub">${['الفكرة والشاشات والأسئلة الشائعة — ٥ دقايق','الفكرة والشاشات والأسئلة الشائعة — ٥ دقائق','The idea, the screens and the FAQ — 5 minutes'][LI]}</p></div>
+        <a class="btn btn-gold" style="text-decoration:none" href="guide.html" target="_blank" rel="noopener">${['افتح','فتح','Open'][LI]}</a></div>
+      <div class="card row"><div class="ico">📲</div><div class="grow"><p class="t-name">${['ابعت الدليل لحد','أرسل الدليل لأحد','Send the guide'][LI]}</p></div>
+        <button class="btn btn-ghost" onclick="shareGuide()">${['واتساب','واتساب','WhatsApp'][LI]}</button></div></div>
 
     <div class="sec"><p class="sec-t">${['النموذج التجريبي','النموذج التجريبي','Prototype'][LI]}</p>
       <div class="card row"><div class="ico">🪄</div><div class="grow"><p class="t-name">${['إعداد عيلة جديدة','إعداد عائلة جديدة','New family setup'][LI]}</p></div>

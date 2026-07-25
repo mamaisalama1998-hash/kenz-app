@@ -373,8 +373,8 @@ const SYNC=['lang','country','familyName','parentPin','kids','rewards','rewardRe
   'behaviors','notifs','followers','packs','features','quest','period','bonusPct'];
 
 function freshData(){
-  S.features={jar:true,quest:true,mascot:true,ceremony:true,stories:true,religious:true};
-  S.quest={n:['رحلة أكوا بارك 🎢','رحلة إلى المدينة المائية 🎢','A water-park trip 🎢'],total:400,prog:0};
+  S.features={jar:true,quest:false,mascot:true,ceremony:true,stories:true,religious:true};
+  S.quest={n:['','',''],total:200,prog:0};   // never promise the kids anything the parents didn't choose
   S.behaviors=[
     {id:'shout',ico:'📢',pts:3,n:['صوت عالي','رفع الصوت','Shouting']},
     {id:'hit',  ico:'🤜',pts:5,n:['ضرب الأخوات','ضرب الإخوة','Hitting a sibling']},
@@ -407,6 +407,7 @@ function clearNotices(kidId){ const k=kid(kidId); if(k)k.notices=[]; render() }
 function nm(o){ return o && o.n ? (o.n[LI]!==undefined?o.n[LI]:o.n[1]) : (o&&o.name)||'' }
 function sub(o){ return o && o.s ? (o.s[LI]!==undefined?o.s[LI]:o.s[1]) : '' }
 function freqLabel(w){ const f=FREQ.find(x=>x[3]===w); return f?(f[LI]!==undefined?f[LI]:f[1]):'' }
+function questOn(){ return S.features.quest && S.quest && (S.quest.n||[]).some(x=>x&&x.trim()) }
 function kid(id){ return S.kids.find(k=>k.id===id) }
 function cur(){ return kid(S.curKid)||S.kids[0] }
 function appKids(){ return S.kids.filter(k=>k.usesApp) }
@@ -609,6 +610,7 @@ function startWizard(){
     kids:[{name:'',age:8,g:'boy',av:'🦊',usesApp:true,pin:''}],
     religious:true,period:'weekly',ki:0,sel:[],selAge:[],
     rw:RW_SUGGEST.map(r=>({...r,on:['screen','movie','meal','play','big'].includes(r.id)})),
+    questOn:false,questName:'',questTotal:200,
     targets:[],bonus:10};
   render();
 }
@@ -652,6 +654,9 @@ function wCopy(j){ const w=S.wiz;
 function wUndo(){ const w=S.wiz;
   if(w.backups&&w.backups[w.ki]!==undefined){ w.sel[w.ki]=w.backups[w.ki]; delete w.backups[w.ki]; render() } }
 function wRw(id){ const r=S.wiz.rw.find(x=>x.id===id); r.on=!r.on; render() }
+function wQuestOn(){ S.wiz.questOn=!S.wiz.questOn; render() }
+function wQuestName(v){ S.wiz.questName=v }
+function wQuestTotal(d){ S.wiz.questTotal=Math.max(20,(S.wiz.questTotal||200)+d*20); render() }
 function wRwCost(id,d){ const r=S.wiz.rw.find(x=>x.id===id); r.cost=Math.max(5,r.cost+d*5); render() }
 function wTarget(i,d){ S.wiz.targets[i]=Math.max(5,Math.min(wPoss(i),S.wiz.targets[i]+d*5)); render() }
 function wSetTarget(i,v){ S.wiz.targets[i]=Math.max(5,Math.min(wPoss(i),v)); render() }
@@ -684,6 +689,9 @@ function wFinish(){
   S.country=w.country; S.lang=w.lang; LI=w.lang; S.familyName=w.family.trim();
   S.parentPin=w.pin; S.period=w.period; S.bonusPct=w.bonus;
   S.features.religious=w.religious;
+  const qn=(w.questName||'').trim();
+  S.features.quest = !!(w.questOn&&qn);
+  S.quest={n:[qn,qn,qn],total:w.questTotal||200,prog:0};
   S.rewards=w.rw.filter(r=>r.on).map(r=>({id:r.id,ico:r.ico,cost:r.cost,n:r.n}));
   S.kids=w.kids.map((k,i)=>({
     id:'k'+(i+1),name:k.name.trim(),age:k.age,g:k.g,av:k.av,usesApp:k.usesApp,pin:k.pin,
@@ -843,7 +851,15 @@ function wizardHTML(){
         <button class="cbx${r.on?' on':''}" onclick="wRw('${r.id}')" aria-label="${nm(r)}">${r.on?'✓':''}</button>
         <div class="ico">${r.ico}</div><div class="grow"><p class="t-name" style="font-size:13.5px">${nm(r)}</p></div>
         <div class="stepper"><button onclick="wRwCost('${r.id}',-1)">−</button><span class="v num">${r.cost}</span><button onclick="wRwCost('${r.id}',1)">+</button></div></div>`).join('')+
-      rwForm(true);
+      rwForm(true)+
+      `<div class="card" style="margin-top:6px">
+        <div class="row"><div class="ico">🎢</div><div class="grow">
+          <p class="t-name">${['مهمة العيلة (اختياري)','مهمة العائلة (اختياري)','Family quest (optional)'][LI]}</p>
+          <p class="t-sub">${['هدف واحد مشترك — نقاط كل الأولاد بتتجمع فيه، ولما يوصلوه تنفذوا المكافأة دي سوا.','هدف مشترك واحد — تتجمع فيه نقاط جميع الأطفال، وعند بلوغه تنفذون المكافأة معًا.','One shared goal — all the children’s points add up, and when they reach it you do this together.'][LI]}</p></div>
+          ${toggleH(w.questOn,'wQuestOn()','')}</div>
+        ${w.questOn?`<input class="inp" style="margin-top:9px" value="${w.questName||''}" placeholder="${['المكافأة المشتركة — مثال: رحلة أو عزومة','المكافأة المشتركة — مثال: رحلة أو وليمة','The shared prize — e.g. a trip or a meal out'][LI]}" oninput="wQuestName(this.value)">
+          <div class="row" style="margin-top:9px;justify-content:space-between"><span class="lbl" style="margin:0">${['كام نقطة يجمعوها سوا؟','كم نقطة يجمعونها معًا؟','How many points together?'][LI]}</span>
+          ${stepperH('wQuestTotal',w.questTotal||200)}</div>`:''}</div>`;
     foot=backB+nextB;
   }
   else if(w.step===6){
@@ -1191,6 +1207,12 @@ function delRw(id){
   S.ui.delRw=null; if(r)logIt(`🗑 ${nm(r)}`); render();
 }
 function togglePack(id){ const p=S.packs.find(x=>x.id===id); p.on=!p.on; render() }
+function bumpQuest(d){ S.quest.total=Math.max(20,S.quest.total+d*20); render() }
+function saveQuest(v){
+  const q=(v||'').trim();
+  if(!q){ toast(['اكتب اسم المكافأة الأول','أدخل اسم المكافأة أولًا','Name the prize first'][LI]); return }
+  S.quest.n=[q,q,q]; logIt(`🎢 ${q}`); toast('🎢 '+q);
+}
 function toggleFeature(k){ S.features[k]=!S.features[k];
   if(k==='stories'&&!S.features.stories&&S.childTab==='stories') S.childTab='today'; render() }
 function setKidPin(kidId,v){
@@ -1287,7 +1309,7 @@ function childToday(){
       ? `<b style="color:var(--good)">${['البونص +'+Math.round(k.week*S.bonusPct/100)+' مستنيك 🏆','المكافأة +'+Math.round(k.week*S.bonusPct/100)+' بانتظارك 🏆','Bonus +'+Math.round(k.week*S.bonusPct/100)+' awaits 🏆'][LI]}</b>`
       : `${pend?`<b style="color:var(--gold-deep)">${['+'+pend+' مستنية موافقة ⏳','+'+pend+' بانتظار الاعتماد ⏳','+'+pend+' pending approval ⏳'][LI]}</b> — `:''}${['باقي','بقي',''][LI]} <b style="color:var(--ink)">${Math.max(0,k.target-Math.max(0,k.week))} ${t('pts')}</b> ${['والبونص','والمكافأة','to go for the'][LI]} ${S.bonusPct}% 🌟`}</p></div>
 
-    ${S.features.quest?`<div class="sec"><div class="card quest row"><div class="ico" style="background:rgba(255,255,255,.16)">🎢</div>
+    ${questOn()?`<div class="sec"><div class="card quest row"><div class="ico" style="background:rgba(255,255,255,.16)">🎢</div>
       <div class="grow"><p class="t-name">${['مهمة العيلة','مهمة العائلة','Family quest'][LI]}: ${nm(S.quest)}</p>
       <div class="bar" style="margin-top:6px"><i style="width:${pct(S.quest.prog,S.quest.total)}%;background:linear-gradient(90deg,#F4B93C,#FFD98A)"></i></div>
       <p class="t-sub" style="margin-top:5px">${['كل العيلة جمعت','جمعت العائلة','The family collected'][LI]} <b>${S.quest.prog}</b> / ${S.quest.total} 🤝</p></div></div></div>`:''}
@@ -1513,7 +1535,7 @@ function parentFamily(){
         ${panelFor(k)}</div>`;
     }).join('')}</div>
 
-    ${S.features.quest?`<div class="sec"><p class="sec-t">${['مهمة العيلة','مهمة العائلة','Family quest'][LI]}</p>
+    ${questOn()?`<div class="sec"><p class="sec-t">${['مهمة العيلة','مهمة العائلة','Family quest'][LI]}</p>
       <div class="card quest row"><div class="ico" style="background:rgba(255,255,255,.16)">🎢</div><div class="grow">
       <p class="t-name">${nm(S.quest)}</p>
       <div class="bar" style="margin-top:6px"><i style="width:${pct(S.quest.prog,S.quest.total)}%;background:linear-gradient(90deg,#F4B93C,#FFD98A)"></i></div>
@@ -1615,6 +1637,14 @@ function parentSettings(){
     <div class="sec"><p class="sec-t">${['المزايا','المزايا','Features'][LI]}</p>
       ${fRow('jar','🎯',['برطمان الادخار','جرة الادخار','Savings jar'],['هدف ادخار في محفظة الطفل','هدف ادخار في محفظة الطفل','A savings goal in the wallet'])}
       ${fRow('quest','🎢',['مهمة العيلة','مهمة العائلة','Family quest'],['هدف مشترك لكل الأطفال','هدف مشترك لجميع الأطفال','A shared goal for all children'])}
+      ${S.features.quest?`<div class="card" style="margin-top:-4px">
+        <label class="lbl">${['المكافأة المشتركة','المكافأة المشتركة','The shared prize'][LI]}</label>
+        <input class="inp" id="qName" value="${(S.quest.n||[])[0]||''}" placeholder="${['مثال: رحلة أو عزومة','مثال: رحلة أو وليمة','e.g. a trip or a meal out'][LI]}">
+        <div class="row" style="margin-top:9px;justify-content:space-between"><span class="lbl" style="margin:0">${['النقاط المطلوبة','النقاط المطلوبة','Points needed'][LI]}</span>
+          <div class="stepper"><button onclick="bumpQuest(-1)">−</button><span class="v num">${S.quest.total}</span><button onclick="bumpQuest(1)">+</button></div></div>
+        <p class="t-sub" style="margin-top:7px">${[`المجموع دلوقتي: ${S.quest.prog} نقطة`,`المجموع الآن: ${S.quest.prog} نقطة`,`Collected so far: ${S.quest.prog}`][LI]}</p>
+        <button class="btn btn-teal" style="width:100%;margin-top:8px" onclick="saveQuest(document.getElementById('qName').value)">${t('save')} ✓</button>
+        ${!questOn()?`<p class="t-sub" style="color:var(--coral);margin-top:7px">${['اكتب اسم المكافأة عشان تظهر للأطفال','اكتب اسم المكافأة لتظهر للأطفال','Name the prize so the children can see it'][LI]}</p>`:''}</div>`:''}
       ${fRow('mascot','📦',['المرفق كنزي','الرفيق كنزي','Kenzi the buddy'],['شخصية بتكبر مع التقدم','شخصية تكبر مع التقدم','A character that levels up'])}
       ${fRow('ceremony','🎉',['احتفال نهاية الفترة','احتفال نهاية الفترة','Period celebration'],['شاشة احتفال وشهادة','شاشة احتفال وشهادة','Celebration screen & certificate'])}
       ${fRow('stories','📖',['الحكايات','الحكايات','Stories'],['مكتبة قصص بدون نقاط','مكتبة قصص دون نقاط','A story library, no points'])}

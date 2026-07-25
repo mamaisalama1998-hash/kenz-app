@@ -247,11 +247,60 @@
   </div>
   <div class="phone"><div class="screen" id="screen"></div></div>
   <p class="sync" id="sync"></p>
+  <script src="https://accounts.google.com/gsi/client" async defer onload="gReady()"></script>
   <p class="sync" id="build" style="opacity:.6;font-size:10.5px;letter-spacing:.03em"></p>
 </div>
 
 <script>
 'use strict';
+/* ============================================================================
+   GOOGLE SIGN-IN — paste your OAuth Client ID between the quotes to switch on.
+   How to get it (about 5 minutes, free):
+     1. console.cloud.google.com  →  create a project (any name)
+     2. APIs & Services → OAuth consent screen → External → fill app name + your email
+     3. APIs & Services → Credentials → Create credentials → OAuth client ID
+        → Application type: Web application
+        → Authorised JavaScript origins, add BOTH:
+             https://mamaisalama1998-hash.github.io
+             http://localhost
+     4. Copy the Client ID (ends in .apps.googleusercontent.com) and paste below.
+   Leave it empty and the app simply hides the button — manual entry still works.
+   ============================================================================ */
+const GOOGLE_CLIENT_ID = '';
+
+let gLoaded=false, gInit=false;
+function gReady(){ gLoaded=true; gRender() }
+function gOn(){ return !!GOOGLE_CLIENT_ID && gLoaded && typeof google!=='undefined' && google.accounts }
+function gDecode(jwt){
+  try{
+    const b=jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const j=decodeURIComponent(atob(b).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    return JSON.parse(j);
+  }catch(e){ return null }
+}
+function gCred(resp){
+  const p=gDecode(resp&&resp.credential); if(!p)return;
+  if(S.mode==='wizard'&&S.wiz){ S.wiz.pName=p.name||S.wiz.pName; S.wiz.pEmail=p.email||''; S.wiz.gVerified=true }
+  else if(S.mode==='joinme'){ S.jn=p.name||S.jn; S.je=p.email||''; S.jv=true }
+  toast(['✓ أهلًا '+(p.given_name||p.name||''),'✓ أهلًا '+(p.given_name||p.name||''),'✓ Welcome '+(p.given_name||p.name||'')][LI]);
+}
+function gRender(){
+  if(!gOn())return;
+  const box=document.getElementById('gbtn'); if(!box||box.dataset.done)return;
+  try{
+    if(!gInit){ google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:gCred}); gInit=true }
+    google.accounts.id.renderButton(box,{theme:'filled_blue',size:'large',shape:'pill',
+      text:'continue_with',width:280,locale:LI===2?'en':'ar'});
+    box.dataset.done='1';
+  }catch(e){}
+}
+function gBlock(){
+  if(!GOOGLE_CLIENT_ID) return '';
+  return `<div style="text-align:center;margin-bottom:12px">
+    <div id="gbtn" style="display:flex;justify-content:center"></div>
+    <p class="t-sub" style="margin:9px 0 0">${['أو اكتب بياناتك بنفسك','أو أدخل بياناتك يدويًا','or enter your details manually'][LI]}</p></div>`;
+}
+
 /* ================= i18n : 0=Egyptian Arabic, 1=MSA, 2=English ================= */
 const D={
  brand:['كنز','كنز','Kenz'],
@@ -819,11 +868,14 @@ function wizardHTML(){
       <p class="t-sub" style="margin:6px 2px 0">${t('langNote')}</p>
       <div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:14px">
         <p class="t-name" style="font-size:15px;margin-bottom:8px">👤 ${t('yourData')}</p>
+        ${gBlock()}
         <label class="lbl">${t('yourName')}</label>
         <input class="inp" value="${w.pName||''}" placeholder="${t('yourNamePh')}" oninput="wPName(this.value)">
         <label class="lbl" style="margin-top:10px">${t('yourEmail')}</label>
         <input class="inp" type="email" inputmode="email" value="${w.pEmail||''}" placeholder="name@example.com" oninput="wPEmail(this.value)">
-        <p class="t-sub" style="margin:5px 2px 0">${t('emailNote')}</p>
+        <p class="t-sub" style="margin:5px 2px 0">${w.gVerified
+          ? `<span style="color:var(--good);font-weight:700">✓ ${['اتأكد بحساب جوجل','تم التحقق عبر جوجل','Verified with Google'][LI]}</span>`
+          : t('emailNote')}</p>
         <label class="lbl" style="margin-top:11px">${t('youAre')}</label>
         ${roleRow(w.pRole,'wPRole')}
       </div>
@@ -1070,10 +1122,12 @@ function joinMeHTML(){
   return `<div class="wiz"><div class="wiz-body" style="padding-top:26px">
     <div style="text-align:center"><div style="font-size:48px">👋</div>
     <h2>${t('joinedTitle')}</h2><p class="lead">${t('joinedSub')}</p></div>
+    ${gBlock()}
     <label class="lbl">${t('yourName')}</label>
     <input class="inp" value="${S.jn||''}" placeholder="${t('yourNamePh')}" oninput="jSet('jn',this.value)">
     <label class="lbl" style="margin-top:11px">${t('yourEmail')}</label>
     <input class="inp" type="email" inputmode="email" value="${S.je||''}" placeholder="name@example.com" oninput="jSet('je',this.value)">
+    ${S.jv?`<p class="t-sub" style="margin:5px 2px 0;color:var(--good);font-weight:700">✓ ${['اتأكد بحساب جوجل','تم التحقق عبر جوجل','Verified with Google'][LI]}</p>`:''}
     <label class="lbl" style="margin-top:11px">${t('youAre')}</label>
     ${roleRow(S.jr,'jRole')}
     </div><div class="wiz-foot">
@@ -2080,6 +2134,7 @@ function render(){
   const el2=document.querySelector('#screen .body, #screen .wiz-body');
   if(el2&&pos) el2.scrollTop=pos;
   lastView=vk;
+  if(S.mode==='wizard'||S.mode==='joinme') gRender();
   whoBar(); syncChip();
   if(S.ceremony) confetti();
   save(); maybeSync();

@@ -197,6 +197,25 @@
     .pop{animation:pop .45s ease}
     @keyframes pop{ 0%{transform:scale(.6); opacity:0} 100%{transform:scale(1); opacity:1} }
   }
+  .helpfab{position:absolute; bottom:76px; inset-inline-start:12px; z-index:18;
+    width:38px; height:38px; border-radius:50%; background:var(--card); color:var(--teal-deep);
+    border:1px solid var(--line); box-shadow:var(--shadow); font-size:18px; font-weight:800;
+    display:grid; place-items:center; opacity:.92}
+  :root[data-theme="dark"] .helpfab{color:var(--gold)}
+  @media (prefers-color-scheme: dark){ .helpfab{color:var(--gold)} }
+  .sheet-bg{position:absolute; inset:0; z-index:24; background:rgba(10,25,24,.55); display:flex; align-items:flex-end}
+  .sheet{background:var(--card); width:100%; border-radius:22px 22px 0 0; padding:18px 18px 16px;
+    max-height:82%; overflow-y:auto; box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+  .sheet .grip{width:38px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 12px}
+  .sheet h4{margin:0 0 3px; font-size:17px}
+  .sheet .lead2{margin:0 0 12px; font-size:13px; color:var(--ink-soft)}
+  .sheet ul{margin:0; padding:0; list-style:none}
+  .sheet li{display:flex; gap:9px; align-items:flex-start; margin-bottom:10px; font-size:14px; line-height:1.75}
+  .sheet li b{color:var(--teal-deep)}
+  :root[data-theme="dark"] .sheet li b{color:var(--gold)}
+  .sheet li .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex:0 0 auto;margin-top:8px}
+  @media (prefers-reduced-motion: no-preference){ .sheet{animation:up .22s ease} @keyframes up{from{transform:translateY(24px)}} }
+
   .toast{position:absolute; bottom:72px; inset-inline:12px; z-index:20; background:var(--ink); color:var(--ground);
     border-radius:14px; padding:11px 14px; font-size:12.5px; font-weight:700; text-align:center; box-shadow:var(--shadow)}
 
@@ -1870,6 +1889,95 @@ function ceremonyHTML(){
        <button class="btn" style="background:transparent;color:#fff;margin-top:8px;font-size:13px" onclick="closeCeremony()">${['لاحقًا','لاحقًا','Later'][LI]}</button>`;
   return `<div class="overlay"><div class="confetti" id="cfbox"></div>${inner}</div>`;
 }
+/* ================= contextual help ================= */
+const HELP={
+ w1:[['نبدأ منين؟','من أين نبدأ؟','Where to start'],[
+  ['اختار دولتك واللغة هتتظبط لوحدها — وتقدر تغيّرها بعدين.','اختر دولتك وستُضبط اللغة تلقائيًا — ويمكن تغييرها لاحقًا.','Pick your country and the language sets itself — changeable later.'],
+  ['لو وصلك <b>رابط عيلة</b> من حد، الصقه تحت — متعملش إعداد جديد.','إن وصلك <b>رابط عائلة</b>، الصقه بالأسفل — لا تبدأ إعدادًا جديدًا.','If someone sent you a <b>family link</b>, paste it below — don’t start a new setup.'],
+  ['الإعداد يتعمل <b>مرة واحدة على موبايل واحد</b>، والباقي ينضموا بالرابط.','يتم الإعداد <b>مرة واحدة على جهاز واحد</b>، والبقية ينضمون بالرابط.','Set up <b>once, on one phone</b>; everyone else joins by link.']]],
+ w2:[['الأطفال','الأطفال','The children'],[
+  ['خلّي الطفل يختار شخصيته بنفسه — بيحس إن الحساب بتاعه.','دع الطفل يختار شخصيته — ليشعر أن الحساب حسابه.','Let each child pick their own avatar — it makes the account theirs.'],
+  ['طفل <b>مامعهوش موبايل</b>؟ اقفل التوجل — وانتوا هتسجّلوا له من كارته، وليه نقاط ومحفظة زي إخواته.','طفل <b>بلا هاتف</b>؟ أوقف المفتاح — وستسجّلون له من بطاقته، وله نقاط ومحفظة كإخوته.','No phone? Turn the toggle off — you record for them, and they still get points and a wallet.'],
+  ['اللي معاه موبايل لازم <b>رقم سري ٤ أرقام</b> مختلف عن إخواته.','من لديه هاتف يحتاج <b>رقمًا سريًا من ٤ أرقام</b> مختلفًا عن إخوته.','A child with a phone needs a <b>4-digit PIN</b>, different from their siblings’.']]],
+ w3:[['قيم العيلة والحماية','قيم العائلة والحماية','Values & protection'],[
+  ['المحتوى الديني <b>اختياري بالكامل</b> — شيله ومفيش حاجة هتنقص.','المحتوى الديني <b>اختياري تمامًا</b> — أوقفه ولن ينقص شيء.','Religious content is <b>fully optional</b> — turn it off and nothing breaks.'],
+  ['«نحسب النقاط كل قد إيه» = إمتى نقفل الحساب ونحوّل النقاط للمحفظة ونمنح البونص.','«متى نحسب النقاط» = متى نغلق الحساب وننقل النقاط للمحفظة ونمنح المكافأة.','“When do we count” = when the tally closes, points move to the wallet and the bonus is granted.'],
+  ['رقم بابا وماما بيقفل الإعدادات والموافقات — لازم يكون <b>غير أرقام الأطفال</b>.','رقم ولي الأمر يقفل الإعدادات والموافقات — ويجب أن <b>يختلف عن أرقام الأطفال</b>.','The parent PIN locks settings and approvals — it must <b>differ from the kids’</b>.']]],
+ w4:[['مهام الطفل','مهام الطفل','The child’s tasks'],[
+  ['<b>ابدأ بـ٤ أو ٥ مهام بس.</b> أسبوع سهل يكسبه = أسبوع تاني هيحبه.','<b>ابدأ بـ٤ أو ٥ مهام فقط.</b> أسبوع سهل يفوز به = أسبوع تالٍ يحبه.','<b>Start with just 4–5 tasks.</b> An easy first week is what brings them back.'],
+  ['<b>كل يوم</b> = بتتجدد كل صباح · <b>في الأسبوع</b> = يعملها في أي يوم.','<b>كل يوم</b> = تتجدد كل صباح · <b>في الأسبوع</b> = ينفذها أي يوم.','<b>Every day</b> = resets each morning · <b>Per week</b> = any day.'],
+  ['السطر الغامق تحت كل مهمة = <b>أقصى نقاط</b> ممكنة منها في الفترة.','السطر الغامق أسفل كل مهمة = <b>أقصى نقاط</b> ممكنة منها في الفترة.','The bold line under each task = the <b>most points</b> it can give this period.']]],
+ w5:[['المكافآت','المكافآت','Rewards'],[
+  ['<b>التطبيق مش هيوعد الطفل بأي حاجة انت ما اخترتهاش.</b> اختار اللي هتنفذه فعلاً.','<b>لن يَعِد التطبيق طفلك بشيء لم تختره.</b> اختر ما ستنفّذه فعلًا.','<b>The app promises nothing you didn’t choose.</b> Pick what you’ll really honour.'],
+  ['حط مكافأة <b>رخيصة (٢٠–٣٠ نقطة)</b> عشان ياخدها بدري ويصدّق النظام.','أضف مكافأة <b>رخيصة (٢٠–٣٠ نقطة)</b> لينالها مبكرًا ويثق بالنظام.','Add one <b>cheap reward (20–30 pts)</b> so they win something early and believe the system.'],
+  ['<b>مهمة العيلة</b> اختيارية: هدف مشترك تتجمع فيه نقاط كل الأولاد.','<b>مهمة العائلة</b> اختيارية: هدف مشترك تتجمع فيه نقاط الجميع.','The <b>family quest</b> is optional: one shared goal all the kids feed.']]],
+ w6:[['الهدف والبونص','الهدف والمكافأة','Target & bonus'],[
+  ['مش لازم تحسب حاجة — <b>٣ أزرار جاهزة</b>: سهل / متوازن / صعب.','لا تحتاج لحساب — <b>٣ أزرار جاهزة</b>: سهل / متوازن / صعب.','No maths needed — <b>3 ready buttons</b>: easy / balanced / hard.'],
+  ['أول أسبوع اختار <b>سهل</b> أو <b>متوازن</b>. تقدر تصعّبه بعدين.','في الأسبوع الأول اختر <b>سهل</b> أو <b>متوازن</b>، وارفعه لاحقًا.','For week one pick <b>easy</b> or <b>balanced</b>; raise it later.'],
+  ['السطر تحت بيقول كام نقطة يقدر <b>يفوّتها</b> ويفضل محقق هدفه.','السطر بالأسفل يوضح كم نقطة يمكنه <b>تفويتها</b> ويظل محققًا لهدفه.','The line below says how many points they can <b>miss</b> and still win.']]],
+ w7:[['رابط العيلة','رابط العائلة','The family link'],[
+  ['ابعت الرابط ده لباقي الموبايلات — بيه بيشوفوا نفس البيانات لحظيًا.','أرسل هذا الرابط لبقية الأجهزة — به يرون البيانات نفسها لحظيًا.','Send this link to the other phones — they’ll see the same data live.'],
+  ['كل موبايل يفتحه <b>من كروم</b> مش من متصفح واتساب.','ليفتحه كل جهاز <b>من كروم</b> لا من متصفح واتساب.','Each phone should open it <b>in Chrome</b>, not WhatsApp’s browser.'],
+  ['الباقي <b>ينضموا بالرابط</b> — ما يعملوش إعداد جديد أبدًا.','البقية <b>ينضمون بالرابط</b> — دون إعداد جديد أبدًا.','Everyone else <b>joins by link</b> — never a new setup.']]],
+ sw:[['مين بيستخدم دلوقتي؟','من يستخدم الآن؟','Who’s using it?'],[
+  ['كل واحد يدوس على صورته ويكتب رقمه — <b>من غير تسجيل خروج</b>.','يضغط كل واحد صورته ويُدخل رقمه — <b>دون تسجيل خروج</b>.','Each person taps their face and enters their PIN — <b>no logging out</b>.'],
+  ['الأطفال اللي مامعهمش موبايل <b>مش بيظهروا هنا</b> — انتوا بتسجّلوا لهم.','الأطفال بلا هاتف <b>لا يظهرون هنا</b> — تسجّلون لهم أنتم.','Children without a phone <b>don’t appear here</b> — you record for them.'],
+  ['واجهة بابا وماما <b>بترجع تتقفل</b> أول ما تبدّل لحساب طفل.','تُقفل واجهة ولي الأمر <b>تلقائيًا</b> عند التبديل لحساب طفل.','The parent area <b>re-locks</b> the moment you switch to a child.']]],
+ ct:[['شاشة الطفل','شاشة الطفل','The child’s screen'],[
+  ['دوس <b>«تم ✓»</b> لما تخلّص المهمة — والنقطة بتتحسب بعد ما بابا أو ماما يوافقوا.','اضغط <b>«تم ✓»</b> عند إنهاء المهمة — وتُحتسب النقطة بعد موافقة والديك.','Tap <b>“Done ✓”</b> when you finish — the point counts after a parent approves.'],
+  ['الرقم فوق = نقاط الفترة، و<b>«+ ⏳»</b> = نقاط مستنية موافقة.','الرقم أعلى = نقاط الفترة، و<b>«+ ⏳»</b> = نقاط بانتظار الموافقة.','The top number is this period’s points; <b>“+ ⏳”</b> is waiting for approval.'],
+  ['تحت كل مهمة: <b>النهارده كام</b> و<b>الفترة كام</b>.','أسفل كل مهمة: <b>اليوم كم</b> و<b>الفترة كم</b>.','Under each task: <b>today</b> and <b>this period</b>.']]],
+ cw:[['المحفظة','المحفظة','The wallet'],[
+  ['نقاط الفترة بتنزل المحفظة <b>لما الفترة تتقفل</b> — ومعاها البونص.','تنتقل نقاط الفترة إلى المحفظة <b>عند إغلاقها</b> — ومعها المكافأة.','Period points land in the wallet <b>when the period closes</b> — with the bonus.'],
+  ['المحفظة بس هي اللي <b>بتشتري بيها مكافآت</b>.','المحفظة وحدها هي التي <b>تشتري بها المكافآت</b>.','Only the wallet <b>buys rewards</b>.'],
+  ['<b>الخصم عمره ما بياخد من المحفظة</b> — بيأثر على نقاط الفترة بس.','<b>لا يمس الخصم المحفظة أبدًا</b> — يؤثر على نقاط الفترة فقط.','<b>Deductions never touch the wallet</b> — only this period’s points.']]],
+ cr:[['متجر المكافآت','متجر المكافآت','The reward store'],[
+  ['<b>المتاح</b> = رصيدك ناقص اللي محجوز في طلبات مستنية.','<b>المتاح</b> = رصيدك ناقص المحجوز في طلبات معلّقة.','<b>Available</b> = your balance minus what’s held in pending requests.'],
+  ['لما تطلب مكافأة نقاطها <b>بتستنى</b> — ولو اترفض الطلب <b>بترجع كاملة</b>.','عند طلب مكافأة <b>تُحجز</b> نقاطها — وإن رُفض الطلب <b>تعود كاملة</b>.','Requesting holds the points — if refused they <b>come back in full</b>.'],
+  ['المكافآت دي <b>بابا وماما اختاروها</b> بنفسهم.','هذه المكافآت <b>اختارها والداك</b>.','These rewards were <b>chosen by your parents</b>.']]],
+ cs:[['الحكايات','الحكايات','Stories'],[
+  ['<b>الحكايات مالهاش نقاط — عن قصد.</b> عشان القراءة تفضل متعة مش شغل.','<b>لا نقاط للحكايات — عن قصد</b>، لتبقى القراءة متعة لا واجبًا.','<b>Stories give no points, on purpose</b> — reading stays a pleasure, not a chore.']]],
+ pf:[['لوحة العيلة','لوحة العائلة','The family board'],[
+  ['<b>✍️ سجّل إنجاز</b> — تسجّل بنفسك بدل الطفل (ضروري لو مامعهوش موبايل).','<b>✍️ تسجيل إنجاز</b> — تسجّل بدلًا عن الطفل (ضروري لمن لا هاتف له).','<b>✍️ Record task</b> — log it yourself for the child (essential if they have no phone).'],
+  ['<b>➖ خصم</b> — الطفل يشوف السبب ويقدر يعترض · <b>⭐ مكافأة</b> — نقاط لحاجة حلوة مش في القايمة.','<b>➖ خصم</b> — يرى الطفل السبب ويعترض · <b>⭐ مكافأة</b> — نقاط لأمر جميل خارج القائمة.','<b>➖ Deduct</b> — the child sees why and can appeal · <b>⭐ Reward</b> — points for something good.'],
+  ['<b>↩ صحّح</b> — تتراجع عن أي حركة عملتها بالغلط · <b>🏁 أغلق الفترة</b> — النقاط تروح المحفظة والبونص يتضاف.','<b>↩ تصحيح</b> — تراجع عن أي حركة خاطئة · <b>🏁 إغلاق الفترة</b> — تنتقل النقاط والمكافأة.','<b>↩ Fix</b> — undo any mistake · <b>🏁 Close period</b> — points and bonus move to the wallet.']]],
+ pa:[['الموافقات','الموافقات','Approvals'],[
+  ['<b>مفيش نقطة بتتحسب من غير موافقتك</b> — ده أهم مبدأ في التطبيق.','<b>لا تُحتسب نقطة دون موافقتك</b> — أهم مبادئ التطبيق.','<b>No point counts without your approval</b> — the app’s core rule.'],
+  ['الرفض <b>لازم سبب</b>، والطفل بيشوفه ويقدر يحاول تاني.','الرفض <b>يتطلب سببًا</b>، ويراه الطفل ويمكنه إعادة المحاولة.','Rejecting <b>needs a reason</b>; the child sees it and can retry.'],
+  ['هنا كمان <b>اعتراضات الخصم</b> و<b>طلبات المكافآت</b>.','هنا أيضًا <b>اعتراضات الخصم</b> و<b>طلبات المكافآت</b>.','This screen also holds <b>appeals</b> and <b>reward requests</b>.']]],
+ pr:[['التقارير','التقارير','Reports'],[
+  ['<b>ميزان العدالة</b>: الإيجابي لازم يفضل أثقل من الخصومات دايمًا.','<b>ميزان العدالة</b>: يجب أن يبقى الإيجابي أثقل من الخصومات.','<b>Fairness balance</b>: the positive must always outweigh deductions.'],
+  ['الأرقام دي <b>للفترة الحالية</b> — وبعد أول إغلاق هتشوف مقارنة.','هذه الأرقام <b>للفترة الحالية</b> — وبعد أول إغلاق ستظهر مقارنة.','These numbers are <b>for the current period</b>; comparisons appear after the first close.'],
+  ['التطبيق بيقترح بس — <b>مش بيغيّر أي حاجة من غير موافقتك</b>.','التطبيق يقترح فقط — <b>ولا يغيّر شيئًا دون موافقتك</b>.','The app only suggests — <b>it changes nothing without you</b>.']]],
+ ps:[['الإعدادات','الإعدادات','Settings'],[
+  ['أي تغيير هنا <b>بيظهر فورًا</b> على كل موبايلات العيلة.','كل تغيير هنا <b>يظهر فورًا</b> على أجهزة العائلة.','Any change here <b>appears instantly</b> on every family phone.'],
+  ['من هنا: <b>الأرقام السرية</b>، المهام والنقاط، المكافآت، والهدف.','من هنا: <b>الأرقام السرية</b>، المهام والنقاط، المكافآت، والهدف.','From here: <b>PINs</b>, tasks and points, rewards, and targets.'],
+  ['<b>رابط العيلة</b> والانضمام لعيلة تانية تحت خالص.','<b>رابط العائلة</b> والانضمام لعائلة أخرى في الأسفل.','The <b>family link</b> and joining another family are at the bottom.']]]
+};
+function helpKey(){
+  if(S.mode==='wizard') return 'w'+Math.min(7,S.wiz?S.wiz.step:1);
+  if(S.mode==='share') return 'w7';
+  if(S.mode==='switch') return 'sw';
+  if(S.role==='child') return {today:'ct',wallet:'cw',rewards:'cr',stories:'cs'}[S.childTab]||'ct';
+  return {family:'pf',approve:'pa',reports:'pr',settings:'ps',deduct:'pf'}[S.parentTab]||'pf';
+}
+function openHelp(){ S.help=true; render() }
+function closeHelp(){ S.help=false; render() }
+function helpFab(){ return S.help?'':`<button class="helpfab" onclick="openHelp()" aria-label="${['مساعدة','مساعدة','Help'][LI]}">؟</button>` }
+function helpSheet(){
+  const h=HELP[helpKey()]||HELP.pf, ttl=h[0][LI]||h[0][1];
+  return `<div class="sheet-bg" onclick="closeHelp()">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="grip"></div>
+      <h4>💡 ${ttl}</h4>
+      <p class="lead2">${['نصايح سريعة للشاشة دي','نصائح سريعة لهذه الشاشة','Quick tips for this screen'][LI]}</p>
+      <ul>${h[1].map(b=>`<li><span class="dot"></span><span>${b[LI]||b[1]}</span></li>`).join('')}</ul>
+      <div class="row" style="gap:8px;margin-top:14px">
+        <a class="btn btn-gold grow" style="text-decoration:none;text-align:center" href="guide.html" target="_blank" rel="noopener">📖 ${['الدليل الكامل','الدليل الكامل','Full guide'][LI]}</a>
+        <button class="btn btn-teal grow" onclick="closeHelp()">${['فهمت','فهمت','Got it'][LI]}</button>
+      </div>
+    </div></div>`;
+}
 /* ================= render + boot ================= */
 function whoBar(){
   const el=document.getElementById('who'); if(!el)return;
@@ -1909,6 +2017,8 @@ function render(){
     h+=`<div class="toast">${S.toast}</div>`;
     setTimeout(()=>{ if(S.toast){ S.toast=null; render() } },2600);
   }
+  if(!S.ceremony && S.mode!=='pin' && S.mode!=='recover' && S.mode!=='confirmJoin') h+=helpFab();
+  if(S.help) h+=helpSheet();
   if(S.ceremony) h+=ceremonyHTML();
   document.getElementById('screen').innerHTML=h;
   const el2=document.querySelector('#screen .body, #screen .wiz-body');

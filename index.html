@@ -1102,6 +1102,31 @@ function doDeduct(kidId,bid){
   logIt(`➖ ${nm(b)} · ${k.name} −${b.pts}`);
   S.ui.panel=null; toast(`➖ ${nm(b)} −${b.pts}`);
 }
+/* one-off deduction for something not on the list (PRD FR-023) */
+const df={on:false,name:'',pts:3,keep:true};
+function dfOpen(){ Object.assign(df,{on:true,name:'',pts:3,keep:true}); render() }
+function dfName(v){ df.name=v }
+function dfPts(d){ df.pts=Math.max(1,df.pts+d); render() }
+function dfKeep(){ df.keep=!df.keep; render() }
+function dfApply(kidId){
+  const nme=(df.name||'').trim();
+  if(!nme){ toast(['اكتب اللي حصل الأول','اكتب ما حدث أولًا','Describe what happened first'][LI]); return }
+  const k=kid(kidId); if(!k)return;
+  const n=[nme,nme,nme], did='d'+(seq++);
+  if(df.keep) S.behaviors.push({id:'b'+(seq++),ico:'⚠️',pts:df.pts,n});
+  k.week-=df.pts;
+  k.deductions.push({id:did,ico:'⚠️',pts:df.pts,n,st:'active',appeal:null});
+  addMove(kidId,'deduct',nme,df.pts,{dedId:did});
+  logIt(`➖ ${nme} · ${k.name} −${df.pts}`);
+  df.on=false; S.ui.panel=null;
+  toast(`➖ ${nme} −${df.pts}`+(df.keep?' · '+['اتحفظ للمرات الجاية','حُفظ للمرات القادمة','saved for next time'][LI]:''));
+}
+function delBeh(id){
+  if(S.ui.delBeh!==id){ S.ui.delBeh=id; render(); return }
+  const b=S.behaviors.find(x=>x.id===id);
+  S.behaviors=S.behaviors.filter(x=>x.id!==id); S.ui.delBeh=null;
+  if(b)logIt(`🗑 ${nm(b)}`); render();
+}
 function startAppeal(id){ S.ui.appealing=(S.ui.appealing===id?null:id); render() }
 function sendAppeal(kidId,id){
   const k=kid(kidId), d=k.deductions.find(x=>x.id===id); if(!d)return;
@@ -1465,7 +1490,22 @@ function panelFor(k){
       ${S.behaviors.map(b=>`<div class="card row"><div class="ico">${b.ico}</div><div class="grow">
         <p class="t-name">${nm(b)}</p><p class="t-sub num" style="color:var(--coral)">−${b.pts}</p></div>
         <button class="btn btn-coral btn-sm" onclick="doDeduct('${k.id}','${b.id}')">${['سجّل','تسجيل','Record'][LI]}</button></div>`).join('')}
-      <button class="btn btn-ghost" style="width:100%" onclick="S.ui.panel=null;render()">${['اقفل','إغلاق','Close'][LI]}</button></div>`;
+
+      ${df.on
+        ? `<div class="card" style="border-color:var(--coral)">
+            <label class="lbl">${['حصل إيه؟','ماذا حدث؟','What happened?'][LI]}</label>
+            <input class="inp" value="${df.name}" placeholder="${['مثال: رمى الأكل على الأرض','مثال: ألقى الطعام على الأرض','e.g. threw food on the floor'][LI]}" oninput="dfName(this.value)">
+            <div class="row" style="margin-top:10px;justify-content:space-between"><span class="lbl" style="margin:0">${['قيمة الخصم','قيمة الخصم','Deduction'][LI]}</span>
+              <div class="stepper"><button onclick="dfPts(-1)">−</button><span class="v num" style="color:var(--coral)">−${df.pts}</span><button onclick="dfPts(1)">+</button></div></div>
+            <div class="row" style="margin-top:10px"><div class="grow"><p class="t-name" style="font-size:13px">${['احفظه في القايمة','احفظه في القائمة','Save it to the list'][LI]}</p>
+              <p class="t-sub">${['عشان يبقى جاهز المرات الجاية','ليكون جاهزًا في المرات القادمة','So it’s ready next time'][LI]}</p></div>
+              ${toggleH(df.keep,'dfKeep()','')}</div>
+            <div class="row" style="margin-top:12px;gap:8px">
+              <button class="btn btn-coral grow" onclick="dfApply('${k.id}')">${['سجّل الخصم','تسجيل الخصم','Record it'][LI]}</button>
+              <button class="btn btn-ghost" onclick="df.on=false;render()">${t('cancel')}</button></div></div>`
+        : `<div class="card row" style="justify-content:center"><button class="btn btn-ghost" onclick="dfOpen()">+ ${['سلوك تاني مش في القايمة','سلوك آخر ليس في القائمة','Something else, not listed'][LI]}</button></div>`}
+
+      <button class="btn btn-ghost" style="width:100%" onclick="S.ui.panel=null;df.on=false;render()">${['اقفل','إغلاق','Close'][LI]}</button></div>`;
   }
   if(p==='moves'){
     const ms=S.moves.filter(m=>m.kidId===k.id).slice(0,10);
@@ -1717,7 +1757,12 @@ function parentSettings(){
       <div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">
         ${['خلي الخصومات أصغر من المكافآت دايمًا 💛','لتبقَ الخصومات أصغر من المكافآت دائمًا 💛','Keep deductions smaller than rewards 💛'][LI]}</p></div>
       ${S.behaviors.map(b=>`<div class="card row"><div class="ico">${b.ico}</div><div class="grow"><p class="t-name">${nm(b)}</p></div>
-        <div class="stepper"><button onclick="bumpBeh('${b.id}',-1)">−</button><span class="v num" style="color:var(--coral)">−${b.pts}</span><button onclick="bumpBeh('${b.id}',1)">+</button></div></div>`).join('')}</div>
+        <div class="stepper"><button onclick="bumpBeh('${b.id}',-1)">−</button><span class="v num" style="color:var(--coral)">−${b.pts}</span><button onclick="bumpBeh('${b.id}',1)">+</button></div>
+        ${S.ui.delBeh===b.id
+          ? `<button class="btn btn-coral btn-sm" onclick="delBeh('${b.id}')">${['متأكد؟','تأكيد','Sure?'][LI]}</button>`
+          : `<button class="del-x" onclick="delBeh('${b.id}')">✕</button>`}</div>`).join('')}
+      <div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">
+        💡 ${['عشان تضيف سلوك جديد: من كارت الطفل اضغط «➖ خصم» ← «+ سلوك تاني مش في القايمة»، واختار تحفظه هنا.','لإضافة سلوك جديد: من بطاقة الطفل اضغط «➖ خصم» ← «+ سلوك آخر ليس في القائمة»، واختر حفظه هنا.','To add a new behaviour: on a child’s card tap “➖ Deduct” → “+ Something else, not listed”, and choose to save it here.'][LI]}</p></div></div>
 
     <div class="sec"><p class="sec-t">🏆 ${['الفترة والبونص','الفترة والمكافأة','Period & bonus'][LI]}</p>
       <div class="card row"><div class="ico">📅</div><div class="grow"><p class="t-name">${t('periodL')}</p></div>

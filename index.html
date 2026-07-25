@@ -310,6 +310,7 @@ const SYNC_KEYS=['familyName','kidName','kidAge','kid2Name','kid2Age','target','
   'mascotLvl','goal','quest','prayers','features','period','tasks','behaviors','notifs','followers',
   'pending','rewards','packs'];
 let famToken=null, rev=0, lastSnap='', applyingRemote=false, pushTimer=null, pollTimer=null, syncStatus='off';
+let lastDeclined=null, lastView='';
 
 function packState(){ const o={rev:rev, seq:seq}; SYNC_KEYS.forEach(k=>o[k]=S[k]); return o }
 function applyState(d){
@@ -317,11 +318,12 @@ function applyState(d){
   rev=d.rev||0; if(d.seq>seq) seq=d.seq;
   SYNC_KEYS.forEach(k=>{ if(d[k]!==undefined) S[k]=d[k] });
 }
-function save(){ try{ localStorage.setItem(STORE, JSON.stringify({famToken:famToken, role:S.role, cache:packState()})) }catch(e){} }
+function save(){ try{ localStorage.setItem(STORE, JSON.stringify({famToken:famToken, role:S.role, lastDeclined:lastDeclined, cache:packState()})) }catch(e){} }
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem(STORE));
-    if(d){ famToken=d.famToken||null; if(d.cache){ applyState(d.cache); if(d.role) S.role=d.role; return true } }
+    if(d){ famToken=d.famToken||null; lastDeclined=d.lastDeclined||null;
+      if(d.cache){ applyState(d.cache); if(d.role) S.role=d.role; return true } }
   }catch(e){}
   return false;
 }
@@ -393,7 +395,7 @@ function copyLink(){
 function joinFamily(v){
   const m=(v||'').match(/[a-f0-9]{16,32}/i);
   if(!m){ S.toast='الرابط مش مظبوط — الصق الرابط كاملًا'; render(); return }
-  famToken=m[0]; S.mode='app'; S.role='child'; save();
+  famToken=m[0]; rev=0; S.mode='app'; S.role='child'; save();
   syncStatus='syncing'; renderSync(); render();
   cloudPull().then(ok=>{
     if(ok){ S.toast='🎉 اتوصلت بعائلتك — أهلًا بيك!'; startPoll() }
@@ -678,14 +680,15 @@ function parentSettings(){
       '<p class="t-name">'+t.name+'</p><p class="t-sub">'+t.freq+'</p></div>'+
       '<div class="stepper"><button onclick="bumpTask(\''+t.id+'\',-1)" aria-label="أقل">−</button>'+
       '<span class="v num">+'+t.pts+'</span><button onclick="bumpTask(\''+t.id+'\',1)" aria-label="أكثر">+</button></div></div>').join('')+
-    '<div class="card row" style="justify-content:center"><button class="btn btn-ghost">+ أضف مهمة جديدة</button></div></div>'+
+    tfForm()+'</div>'+
 
     '<div class="sec"><p class="sec-t">السلوكيات والخصومات</p>'+
     '<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 الخصومات دائمًا أصغر من المكافآت — لو زادت عن الحد هننبهك في التقرير.</p></div>'+
     S.behaviors.map(b=>'<div class="card row"><div class="ico">'+b.ico+'</div><div class="grow">'+
       '<p class="t-name">'+b.name+'</p></div>'+
       '<div class="stepper"><button onclick="bumpBeh(\''+b.id+'\',-1)" aria-label="أقل">−</button>'+
-      '<span class="v num" style="color:var(--coral)">−'+b.pts+'</span><button onclick="bumpBeh(\''+b.id+'\',1)" aria-label="أكثر">+</button></div></div>').join('')+'</div>'+
+      '<span class="v num" style="color:var(--coral)">−'+b.pts+'</span><button onclick="bumpBeh(\''+b.id+'\',1)" aria-label="أكثر">+</button></div></div>').join('')+
+    bfForm()+'</div>'+
 
     '<div class="sec"><p class="sec-t">الباقات الموسمية</p>'+
     S.packs.map(p=>'<div class="card row"><div class="ico">'+p.ico+'</div><div class="grow">'+
@@ -809,10 +812,67 @@ function wizDelKid(i){ if(S.wiz.kids.length>1){ S.wiz.kids.splice(i,1); S.wiz.se
 function wizRel(){ S.wiz.religious=!S.wiz.religious; render() }
 function wizPeriod(p){ S.wiz.period=p; render() }
 function wizItem(id){ const s=S.wiz.sel[S.wiz.kidIdx]; const x=s.find(a=>a.id===id); x.on=!x.on; render() }
+function wizCopy(j){
+  const w=S.wiz;
+  w.sel[w.kidIdx]=JSON.parse(JSON.stringify(w.sel[j]));
+  w.selAge[w.kidIdx]=w.kids[w.kidIdx].age;
+  S.toast='📋 اتنسخت مهام '+w.kids[j].name+' — عدّل عليها براحتك'; render();
+}
+
+/* custom task / behavior forms */
+const FREQ_W={'مرة يوميًا':7,'مرتان يوميًا':14,'مرة أسبوعيًا':1,'مرتان أسبوعيًا':2,'٣ مرات أسبوعيًا':3};
+const TF_ICONS=['⭐','🧹','📖','🏃','🎨','🧠','🍎','🛏️','💧','🤝'];
+const tf={on:false,name:'',ico:'⭐',pts:3,freq:'مرة يوميًا'};
+const bf={on:false,name:'',pts:3};
+function tfOpen(){ tf.on=true; tf.name=''; tf.ico='⭐'; tf.pts=3; tf.freq='مرة يوميًا'; render() }
+function tfClose(){ tf.on=false; render() }
+function tfName(v){ tf.name=v }
+function tfIco(i){ tf.ico=i; render() }
+function tfPts(d){ tf.pts=Math.max(1,tf.pts+d); render() }
+function tfFreq(f){ tf.freq=f; render() }
+function tfSave(){
+  const nm=tf.name.trim()||'مهمة جديدة';
+  const item={id:'c'+(seq++), name:nm, ico:tf.ico, pts:tf.pts, freq:tf.freq};
+  if(S.mode==='wizard'){ S.wiz.sel[S.wiz.kidIdx].push(Object.assign({w:FREQ_W[tf.freq],on:true},item)) }
+  else { S.tasks.push(Object.assign({st:'open'},item)); S.toast='✓ اتضافت «'+nm+'» — راجع التارجت لو حابب' }
+  tf.on=false; render();
+}
+function tfForm(){
+  if(!tf.on) return '<div class="card row" style="justify-content:center"><button class="btn btn-ghost" onclick="tfOpen()">+ أضف مهمة جديدة</button></div>';
+  return '<div class="card">'+
+    '<label class="lbl">اسم المهمة</label>'+
+    '<input class="inp" value="'+tf.name+'" placeholder="مثال: قراءة ١٠ دقائق" oninput="tfName(this.value)">'+
+    '<label class="lbl" style="margin-top:10px">الأيقونة</label>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px">'+TF_ICONS.map(i=>'<button class="btn '+(tf.ico===i?'btn-gold':'btn-ghost')+'" style="padding:7px 10px;font-size:17px" onclick="tfIco(\''+i+'\')">'+i+'</button>').join('')+'</div>'+
+    '<div class="row" style="margin-top:12px;justify-content:space-between"><span class="lbl" style="margin:0">النقاط</span>'+
+    '<div class="stepper"><button onclick="tfPts(-1)">−</button><span class="v num">+'+tf.pts+'</span><button onclick="tfPts(1)">+</button></div></div>'+
+    '<label class="lbl" style="margin-top:10px">التكرار</label>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px">'+Object.keys(FREQ_W).map(f=>'<button class="btn '+(tf.freq===f?'btn-teal':'btn-ghost')+'" style="padding:7px 10px;font-size:12px" onclick="tfFreq(\''+f+'\')">'+f+'</button>').join('')+'</div>'+
+    '<div class="row" style="margin-top:14px;gap:8px"><button class="btn btn-teal grow" onclick="tfSave()">حفظ المهمة ✓</button>'+
+    '<button class="btn btn-ghost" onclick="tfClose()">إلغاء</button></div></div>';
+}
+function bfOpen(){ bf.on=true; bf.name=''; bf.pts=3; render() }
+function bfName(v){ bf.name=v }
+function bfPts(d){ bf.pts=Math.max(1,bf.pts+d); render() }
+function bfSave(){
+  const nm=bf.name.trim()||'سلوك جديد';
+  S.behaviors.push({id:'b'+(seq++), name:nm, ico:'⚠️', pts:bf.pts});
+  bf.on=false; S.toast='✓ اتضاف سلوك «'+nm+'» للخصومات'; render();
+}
+function bfForm(){
+  if(!bf.on) return '<div class="card row" style="justify-content:center"><button class="btn btn-ghost" onclick="bfOpen()">+ أضف سلوكًا للخصم</button></div>';
+  return '<div class="card"><label class="lbl">اسم السلوك</label>'+
+    '<input class="inp" value="'+bf.name+'" placeholder="مثال: تأخير عن النوم" oninput="bfName(this.value)">'+
+    '<div class="row" style="margin-top:12px;justify-content:space-between"><span class="lbl" style="margin:0">قيمة الخصم</span>'+
+    '<div class="stepper"><button onclick="bfPts(-1)">−</button><span class="v num" style="color:var(--coral)">−'+bf.pts+'</span><button onclick="bfPts(1)">+</button></div></div>'+
+    '<div class="row" style="margin-top:14px;gap:8px"><button class="btn btn-teal grow" onclick="bfSave()">حفظ ✓</button>'+
+    '<button class="btn btn-ghost" onclick="bf.on=false;render()">إلغاء</button></div></div>';
+}
 function wizBump(id,d){ const x=S.wiz.sel[S.wiz.kidIdx].find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); render() }
 function wizTarget(i,d){ S.wiz.targets[i]=Math.max(5,S.wiz.targets[i]+d*5); render() }
 function wizBonus(d){ S.wiz.bonus=Math.min(50,Math.max(0,S.wiz.bonus+d*5)); render() }
 function wizFinish(){
+  clearTimeout(pushTimer); famToken=null; rev=0; // new family: never write over the old family's cloud doc
   const w=S.wiz, k0=w.kids[0], sel=(w.sel[0]||[]).filter(x=>x.on);
   S.kidName=k0.name; S.kidAge=k0.age;
   if(w.kids[1]){ S.kid2Name=w.kids[1].name; S.kid2Age=w.kids[1].age } else { S.kid2Name='' }
@@ -884,13 +944,19 @@ function wizardHTML(){
   }
   else if(w.step===4){
     const k=w.kids[w.kidIdx], sel=w.sel[w.kidIdx], poss=wizPossible(w.kidIdx);
+    const copyBtns = w.kidIdx>0
+      ? '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+        w.kids.slice(0,w.kidIdx).map((kk,j)=>'<button class="btn btn-gold" style="font-size:12.5px" onclick="wizCopy('+j+')">📋 نفس مهام '+kk.g+' '+kk.name+'</button>').join('')+'</div>'
+      : '';
     body='<h2>مهام '+k.g+' '+k.name+'</h2>'+
       '<p class="lead">دي اقتراحاتنا لسن '+k.age+' سنة — شيل اللي مش مناسب وعدّل النقاط زي ما تحب. <b>مفيش حاجة إجبارية.</b></p>'+
+      copyBtns+
       sel.map(x=>'<div class="card row" style="'+(x.on?'':'opacity:.55')+'">'+
         '<button class="cbx'+(x.on?' on':'')+'" onclick="wizItem(\''+x.id+'\')" aria-label="'+x.name+'">'+(x.on?'✓':'')+'</button>'+
         '<div class="ico">'+x.ico+'</div><div class="grow"><p class="t-name" style="font-size:14px">'+x.name+'</p>'+
         '<p class="t-sub">'+x.freq+'</p></div>'+
         '<div class="stepper"><button onclick="wizBump(\''+x.id+'\',-1)">−</button><span class="v num">+'+x.pts+'</span><button onclick="wizBump(\''+x.id+'\',1)">+</button></div></div>').join('')+
+      tfForm()+
       '<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 مجموع النقاط الممكنة أسبوعيًا: <b class="num">'+poss+'</b></p></div>';
     foot=backBtn+'<button class="btn btn-teal" onclick="wizNext()">'+(w.kidIdx<w.kids.length-1?'الطفل التالي ←':'التالي ←')+'</button>';
   }
@@ -935,11 +1001,20 @@ function ceremonyHTML(){
 
 /* ---------- render ---------- */
 function render(){
+  const viewKey=S.mode+'|'+S.role+'|'+S.childTab+'|'+S.parentTab+'|'+(S.wiz?S.wiz.step+'-'+S.wiz.kidIdx:'');
+  const scEl=document.querySelector('#screen .body, #screen .wiz-body');
+  const scPos=(scEl && viewKey===lastView) ? scEl.scrollTop : 0;
   let html='';
   if(S.mode==='wizard'){
     html = wizardHTML();
   }else if(S.mode==='share'){
     html = shareHTML();
+  }else if(S.mode==='confirmJoin'){
+    html='<div class="wiz"><div class="wiz-body" style="text-align:center;padding-top:46px">'+
+      '<div style="font-size:50px">🔀</div><h2>الرابط ده لعائلة مختلفة</h2>'+
+      '<p class="lead">هاتفك متوصل بعائلة بالفعل.<br>تحب تسيبها وتنضم للعائلة اللي في الرابط؟</p></div>'+
+      '<div class="wiz-foot"><button class="btn btn-ghost" style="flex:1;padding:12px 0" onclick="declineJoin()">لا، خليني في عائلتي</button>'+
+      '<button class="btn btn-teal" style="flex:1;padding:12px 0" onclick="acceptJoin()">انضمام للجديدة</button></div></div>';
   }else if(S.role==='child'){
     if(!S.features.stories && S.childTab==='stories') S.childTab='today';
     html = {today:childToday, wallet:childWallet, rewards:childRewards, stories:childStories}[S.childTab]();
@@ -954,6 +1029,9 @@ function render(){
   }
   if(S.ceremony) html+=ceremonyHTML();
   document.getElementById('screen').innerHTML=html;
+  const scEl2=document.querySelector('#screen .body, #screen .wiz-body');
+  if(scEl2 && scPos) scEl2.scrollTop=scPos;
+  lastView=viewKey;
   document.getElementById('rb-child').textContent='👦 '+S.kidName+' (الطفل)';
   document.getElementById('rb-wiz').classList.toggle('on', S.mode==='wizard');
   if(S.mode!=='wizard'){
@@ -971,14 +1049,27 @@ function render(){
 if('serviceWorker' in navigator && location.protocol==='https:'){
   try{ navigator.serviceWorker.register('sw.js') }catch(e){}
 }
+function acceptJoin(){
+  famToken=S.pendingJoin; S.pendingJoin=null; lastDeclined=null; rev=0;
+  S.mode='app'; S.role='child'; save(); render();
+  cloudPull().then(ok=>{ if(ok){ S.toast='🎉 انضممت للعائلة الجديدة'; startPoll() } render() });
+}
+function declineJoin(){
+  lastDeclined=S.pendingJoin; S.pendingJoin=null;
+  S.mode='app'; save(); render();
+  if(famToken){ cloudPull(); startPoll() }
+}
 (function boot(){
-  const famQ=new URLSearchParams(location.search).get('fam');
+  const q=new URLSearchParams(location.search).get('fam');
+  const famQ=(q && /^[a-f0-9]{16,32}$/i.test(q)) ? q : null;
   const hasLocal=load();
   lastSnap=snapNow();
-  if(famQ && /^[a-f0-9]{16,32}$/i.test(famQ) && famQ!==famToken){
-    famToken=famQ; S.mode='app'; if(!hasLocal) S.role='child';
+  if(famQ && !famToken){
+    famToken=famQ; rev=0; S.mode='app'; if(!hasLocal) S.role='child';
     save(); render();
     cloudPull().then(ok=>{ if(ok){ S.toast='🟢 اتوصلت بعائلتك — البيانات بتتحدث تلقائيًا'; startPoll() } render() });
+  }else if(famQ && famQ!==famToken && famQ!==lastDeclined){
+    S.pendingJoin=famQ; S.mode='confirmJoin'; render();
   }else if(hasLocal){
     S.mode='app'; render();
     if(famToken){ cloudPull(); startPoll() }

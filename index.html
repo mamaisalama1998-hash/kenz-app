@@ -493,7 +493,9 @@ async function cloudCreate(){
   syncSt='err'; syncChip(); return null;
 }
 async function cloudPush(){
-  if(!famToken)return; rev++;
+  if(!famToken)return;
+  if(!S.kids.length)return;      // SAFETY: an empty phone must never overwrite a real family
+  rev++;
   syncSt='syncing'; syncChip();
   try{ const r=await fetch('https://api.npoint.io/'+famToken,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(packS())}); syncSt=r.ok?'ok':'err' }
@@ -540,6 +542,16 @@ function joinFamily(v){
       famToken=prev; save();
       toast(['مفيش نت أو الرابط غلط — جرب تاني','تعذّر الاتصال أو الرابط غير صحيح — أعد المحاولة','No connection or wrong link — try again'][LI]);
     }
+    render();
+  });
+}
+function recoverFamily(){
+  if(!famToken){ toast(['الموبايل ده مش متوصل بعيلة','هذا الجهاز غير متصل بعائلة','This device isn’t linked to a family'][LI]); return }
+  toast(['🔄 بندوّر…','🔄 جارٍ البحث…','🔄 Looking…'][LI]);
+  cloudPull(true).then(ok=>{
+    if(ok&&S.kids.length){ S.mode='switch'; startPoll(); toast(['🎉 رجعت عيلتك!','🎉 عادت عائلتك!','🎉 Your family is back!'][LI]) }
+    else if(ok) toast(['العيلة دي فاضية للأسف','هذه العائلة فارغة للأسف','That family is empty'][LI]);
+    else toast(['مفيش نت — جرب تاني','تعذّر الاتصال — أعد المحاولة','No connection — try again'][LI]);
     render();
   });
 }
@@ -736,6 +748,10 @@ function wizardHTML(){
       <p class="t-sub" style="margin:6px 2px 0">${t('langNote')}</p>
       <label class="lbl" style="margin-top:14px">${t('famName')}</label>
       <input class="inp" value="${w.family}" placeholder="${t('famPh')}" oninput="wFam(this.value)">
+      ${famToken?`<div class="card" style="margin-top:16px;border-color:var(--gold-deep);background:var(--chip)">
+        <p class="t-name" style="font-size:14px">${['الموبايل ده متوصل بعيلة بالفعل','هذا الجهاز متصل بعائلة بالفعل','This device is already linked to a family'][LI]}</p>
+        <p class="t-sub" style="margin-bottom:9px">${['لو دي عيلتك ومش ظاهرة، اضغط استرجاع — متعملش إعداد جديد عشان ما تفقدش بياناتك','إن كانت عائلتك ولم تظهر، اضغط استرجاع — لا تبدأ إعدادًا جديدًا حتى لا تفقد بياناتك','If that’s your family and it isn’t showing, tap restore — don’t start a new setup or you may lose it'][LI]}</p>
+        <button class="btn btn-teal" style="width:100%" onclick="recoverFamily()">🔄 ${['استرجع عيلتي','استرجاع عائلتي','Restore my family'][LI]}</button></div>`:''}
       <div style="text-align:center;margin-top:18px;border-top:1px dashed var(--line);padding-top:14px">
         <p class="lead" style="margin-bottom:8px">${t('gotLink')}</p>
         <input class="inp" id="joinInp" placeholder="${t('pasteLink')}" style="margin-bottom:8px">
@@ -1722,6 +1738,9 @@ function render(){
   else if(S.mode==='pin') h=pinHTML();
   else if(S.mode==='whoami') h=whoamiHTML();
   else if(S.mode==='share') h=shareHTML();
+  else if(S.mode==='recover') h=`<div class="wiz"><div class="wiz-body" style="text-align:center;padding-top:70px">
+      <div style="font-size:48px">🔄</div><h2>${['بنرجّع عيلتك…','جارٍ استرجاع عائلتك…','Restoring your family…'][LI]}</h2>
+      <p class="lead">${['ثواني بس','لحظات من فضلك','Just a moment'][LI]}</p></div></div>`;
   else if(S.mode==='confirmJoin') h=`<div class="wiz"><div class="wiz-body" style="text-align:center;padding-top:44px">
       <div style="font-size:48px">🔀</div><h2>${t('joinAsk')}</h2><p class="lead">${t('joinAskSub')}</p></div>
       <div class="wiz-foot"><button class="btn btn-ghost" style="flex:1;padding:12px 0" onclick="declineJoin()">${t('keepMine')}</button>
@@ -1781,6 +1800,14 @@ if('serviceWorker' in navigator && location.protocol==='https:'){ try{ navigator
   } else if(has&&S.kids.length){
     S.mode='switch'; render();
     if(famToken){ cloudPull(); startPoll() }
+  } else if(famToken){
+    // this phone knows a family but has no data yet — recover it before offering a new setup
+    S.mode='recover'; render();
+    cloudPull(true).then(ok=>{
+      if(ok&&S.kids.length){ S.mode='switch'; startPoll() }
+      else { freshData(); startWizard() }
+      render();
+    });
   } else {
     freshData(); startWizard();
   }

@@ -228,6 +228,7 @@
   </div>
   <div class="phone"><div class="screen" id="screen"></div></div>
   <p class="sync" id="sync"></p>
+  <p class="sync" id="build" style="opacity:.6;font-size:10.5px;letter-spacing:.03em"></p>
 </div>
 
 <script>
@@ -476,8 +477,11 @@ function load(){ try{ const d=JSON.parse(localStorage.getItem(STORE));
   return false }
 function resetAll(){ try{ localStorage.removeItem(STORE) }catch(e){} location.href=location.pathname }
 
+const BUILD='v4.4';
 function syncChip(){
   const el=document.getElementById('sync'); if(!el)return;
+  const tag=document.getElementById('build');
+  if(tag) tag.textContent=BUILD+(famToken?' · '+['عيلة','عائلة','fam'][LI]+' '+famToken.slice(0,6):' · '+['بدون عيلة','بدون عائلة','no family'][LI])+' · '+S.kids.length+' 👧👦';
   const M={off:['📴 نسخة محلية على الهاتف ده بس','📴 نسخة محلية على هذا الجهاز فقط','📴 Local copy on this device only'],
     syncing:['🔄 بيزامن…','🔄 جارٍ المزامنة…','🔄 Syncing…'],
     ok:['🟢 متزامن مع كل هواتف العيلة','🟢 متزامن مع جميع أجهزة العائلة','🟢 Synced with all family devices'],

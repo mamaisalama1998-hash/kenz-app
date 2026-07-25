@@ -373,7 +373,7 @@ const SYNC=['lang','country','familyName','parentPin','kids','rewards','rewardRe
 
 function freshData(){
   S.features={jar:true,quest:true,mascot:true,ceremony:true,stories:true,religious:true};
-  S.quest={name:['رحلة أكوا بارك 🎢','رحلة إلى المدينة المائية 🎢','A water-park trip 🎢'],total:400,prog:0};
+  S.quest={n:['رحلة أكوا بارك 🎢','رحلة إلى المدينة المائية 🎢','A water-park trip 🎢'],total:400,prog:0};
   S.behaviors=[
     {id:'shout',ico:'📢',pts:3,n:['صوت عالي','رفع الصوت','Shouting']},
     {id:'hit',  ico:'🤜',pts:5,n:['ضرب الأخوات','ضرب الإخوة','Hitting a sibling']},
@@ -397,8 +397,13 @@ function freqLabel(w){ const f=FREQ.find(x=>x[3]===w); return f?(f[LI]!==undefin
 function kid(id){ return S.kids.find(k=>k.id===id) }
 function cur(){ return kid(S.curKid)||S.kids[0] }
 function appKids(){ return S.kids.filter(k=>k.usesApp) }
-function possible(k){ return (k.tasks||[]).reduce((a,x)=>a+x.pts*x.w,0) }
+function periodF(){ return S.period==='daily'?(1/7):(S.period==='monthly'?4:1) }
+function capOf(x){ return Math.max(1,Math.round(x.w*periodF())) }
+function possible(k){ return (k.tasks||[]).reduce((a,x)=>a+x.pts*capOf(x),0) }
+function doneOf(x){ return x.done||0 }
 function pendOf(id){ return S.pending.filter(p=>p.kidId===id) }
+function pendCountTask(kidId,taskId){ return S.pending.filter(p=>p.kidId===kidId&&p.taskId===taskId).length }
+function leftOf(kidId,x){ return capOf(x)-doneOf(x)-pendCountTask(kidId,x.id) }
 function pendPts(id){ return pendOf(id).reduce((a,p)=>a+p.pts,0) }
 function heldOf(id){ return S.rewardReqs.filter(r=>r.kidId===id&&r.st==='asked').reduce((a,r)=>{const w=S.rewards.find(x=>x.id===r.rwId);return a+(w?w.cost:0)},0) }
 function availOf(k){ return Math.max(0,k.wallet-heldOf(k.id)) }
@@ -409,7 +414,10 @@ function inbox(){ return S.pending.length
   + S.kids.reduce((a,k)=>a+(k.deductions||[]).filter(d=>d.appeal&&d.appeal.st==='open').length,0)
   + S.rewardReqs.filter(r=>r.st==='asked'||r.st==='todo').length }
 function stamp(){ const d=new Date(); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0') }
-function logIt(txt){ S.audit.unshift({t:stamp(),who:myName||t('parent'),w:txt}); if(S.audit.length>40)S.audit.pop() }
+function logIt(txt){
+  const who = S.role==='child' ? ((cur()||{}).name||'') : (myName||t('parent'));
+  S.audit.unshift({t:stamp(),who,w:txt}); if(S.audit.length>60)S.audit.pop();
+}
 function setLang(l){ S.lang=l; LI=l; applyDir(); render() }
 function applyDir(){
   document.body.dir = LI===2?'ltr':'rtl';
@@ -539,20 +547,33 @@ function wKidAv(i,a){ S.wiz.kids[i].av=a; render() }
 function wKidApp(i){ S.wiz.kids[i].usesApp=!S.wiz.kids[i].usesApp; render() }
 function wKidPin(i,v){ S.wiz.kids[i].pin=(v||'').replace(/\D/g,'') }
 function wAddKid(){ if(S.wiz.kids.length<6){ S.wiz.kids.push({name:'',age:6,g:'boy',av:AVATARS[S.wiz.kids.length%AVATARS.length],usesApp:true,pin:''}); render() } }
-function wDelKid(i){ if(S.wiz.kids.length>1){ S.wiz.kids.splice(i,1); S.wiz.sel.splice(i,1); render() } }
+function wDelKid(i){
+  if(S.wiz.kids.length<=1)return;
+  if(S.wiz.delKid!==i){ S.wiz.delKid=i; render(); return }
+  S.wiz.kids.splice(i,1); S.wiz.sel.splice(i,1); S.wiz.selAge.splice(i,1);
+  if(S.wiz.touched) delete S.wiz.touched[i];
+  S.wiz.delKid=null; render();
+}
 function wRel(){ S.wiz.religious=!S.wiz.religious; render() }
 function wPeriod(p){ S.wiz.period=p; render() }
 function wPin(v){ S.wiz.pin=(v||'').replace(/\D/g,'') }
 function wBuild(i){ const w=S.wiz,k=w.kids[i];
-  if(!w.sel[i]||w.selAge[i]!==k.age||w.selRel!==w.religious){ w.sel[i]=suggestFor(k.age,w.religious); w.selAge[i]=k.age } }
-function wPoss(i){ return (S.wiz.sel[i]||[]).filter(x=>x.on).reduce((a,x)=>a+x.pts*x.w,0) }
-function wItem(id){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.on=!x.on; render() }
-function wBump(id,d){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); render() }
+  if(!w.sel[i]){ w.sel[i]=suggestFor(k.age,w.religious); w.selAge[i]=k.age; return }
+  if(w.touched&&w.touched[i]) return;               // never silently wipe the parent's edits
+  if(w.selAge[i]!==k.age||w.selRel!==w.religious){ w.sel[i]=suggestFor(k.age,w.religious); w.selAge[i]=k.age } }
+function wTouch(){ const w=S.wiz; w.touched=w.touched||{}; w.touched[w.ki]=true }
+function wPoss(i){ return (S.wiz.sel[i]||[]).filter(x=>x.on).reduce((a,x)=>a+x.pts*Math.max(1,Math.round(x.w*periodF())),0) }
+function wItem(id){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.on=!x.on; wTouch(); render() }
+function wBump(id,d){ const x=S.wiz.sel[S.wiz.ki].find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); wTouch(); render() }
+function wDelItem(id){ const w=S.wiz; w.sel[w.ki]=w.sel[w.ki].filter(a=>a.id!==id); wTouch(); render() }
 function wCopy(j){ const w=S.wiz;
   if(w.armed!==j){ w.armed=j; render(); return }
-  w.backup=w.sel[w.ki]; w.armed=null;
-  w.sel[w.ki]=JSON.parse(JSON.stringify(w.sel[j])); w.selAge[w.ki]=w.kids[w.ki].age; render() }
-function wUndo(){ const w=S.wiz; if(w.backup){ w.sel[w.ki]=w.backup; w.backup=null; render() } }
+  w.backups=w.backups||{};
+  if(w.backups[w.ki]===undefined) w.backups[w.ki]=w.sel[w.ki];   // keep the ORIGINAL, not the last copy
+  w.armed=null;
+  w.sel[w.ki]=JSON.parse(JSON.stringify(w.sel[j])); w.selAge[w.ki]=w.kids[w.ki].age; wTouch(); render() }
+function wUndo(){ const w=S.wiz;
+  if(w.backups&&w.backups[w.ki]!==undefined){ w.sel[w.ki]=w.backups[w.ki]; delete w.backups[w.ki]; render() } }
 function wRw(id){ const r=S.wiz.rw.find(x=>x.id===id); r.on=!r.on; render() }
 function wRwCost(id,d){ const r=S.wiz.rw.find(x=>x.id===id); r.cost=Math.max(5,r.cost+d*5); render() }
 function wTarget(i,d){ S.wiz.targets[i]=Math.max(5,S.wiz.targets[i]+d*5); render() }
@@ -560,8 +581,16 @@ function wBonus(d){ S.wiz.bonus=Math.min(50,Math.max(0,S.wiz.bonus+d*5)); render
 function wNext(){
   const w=S.wiz;
   if(w.step===1){ if(!w.family.trim()) w.family=['عيلتنا','عائلتنا','Our family'][LI]; w.step=2 }
-  else if(w.step===2){ w.kids.forEach((k,i)=>{ if(!k.name.trim())k.name=['طفل','طفل','Child'][LI]+' '+(i+1) }); w.step=3 }
-  else if(w.step===3){ w.selRel=w.religious; w.ki=0; wBuild(0); w.step=4 }
+  else if(w.step===2){
+    const bad=w.kids.find(k=>k.usesApp&&(k.pin||'').length<4);
+    if(bad){ toast([`${bad.name||'الطفل'} لازم رقم سري ٤ أرقام`,`${bad.name||'الطفل'} يحتاج رقمًا سريًا من ٤ أرقام`,`${bad.name||'This child'} needs a 4-digit PIN`][LI]); return }
+    const pins=w.kids.filter(k=>k.usesApp).map(k=>k.pin);
+    if(new Set(pins).size!==pins.length){ toast(['كل طفل لازم رقم مختلف','لكل طفل رقم مختلف','Each child needs a different PIN'][LI]); return }
+    w.kids.forEach((k,i)=>{ if(!k.name.trim())k.name=['طفل','طفل','Child'][LI]+' '+(i+1) }); w.step=3 }
+  else if(w.step===3){
+    if((w.pin||'').length<4){ toast(['رقم بابا وماما لازم ٤ أرقام','رقم ولي الأمر يجب أن يكون ٤ أرقام','The parent PIN needs 4 digits'][LI]); return }
+    if(w.kids.some(k=>k.usesApp&&k.pin===w.pin)){ toast(['رقم بابا وماما لازم يكون مختلف عن أرقام الأطفال','يجب أن يختلف رقم ولي الأمر عن أرقام الأطفال','The parent PIN must differ from the children’s'][LI]); return }
+    w.selRel=w.religious; w.ki=0; wBuild(0); w.step=4 }
   else if(w.step===4){ if(w.ki<w.kids.length-1){ w.ki++; wBuild(w.ki) } else { w.step=5 } }
   else if(w.step===5){ if(!w.rw.some(r=>r.on)){ toast(t('rwNone')); return }
     w.kids.forEach((k,i)=>{ w.targets[i]=Math.max(5,Math.round(wPoss(i)*0.75/5)*5) }); w.step=6 }
@@ -581,7 +610,7 @@ function wFinish(){
   S.kids=w.kids.map((k,i)=>({
     id:'k'+(i+1),name:k.name.trim(),age:k.age,g:k.g,av:k.av,usesApp:k.usesApp,pin:k.pin,
     tasks:(w.sel[i]||[]).filter(x=>x.on).map(x=>({id:x.id,ico:x.ico,pts:x.pts,w:x.w,n:x.n,
-      st:x.id==='pray'?undefined:'open', type:x.id==='pray'?'prayer':undefined, prayers:x.id==='pray'?0:undefined})),
+      done:0, type:x.id==='pray'?'prayer':undefined})),
     target:w.targets[i]||30, week:0, wallet:0, lvl:1, deductions:[], achievements:[], goalRw:null, lastClose:null
   }));
   unlocked=true; S.role='parent'; S.parentTab='family'; S.curKid=S.kids[0].id;
@@ -600,7 +629,8 @@ function tfOpen(){ Object.assign(tf,{on:true,name:'',ico:'⭐',pts:3,w:7}); rend
 function tfName(v){ tf.name=v } function tfIco(i){ tf.ico=i; render() }
 function tfPts(d){ tf.pts=Math.max(1,tf.pts+d); render() } function tfW(w){ tf.w=w; render() }
 function tfSave(){
-  const nme=tf.name.trim()||t('addTask');
+  if(!tf.name.trim()){ toast(['اكتب اسم المهمة الأول','أدخل اسم المهمة أولًا','Enter a task name first'][LI]); return }
+  const nme=tf.name.trim();
   const item={id:'c'+(seq++),ico:tf.ico,pts:tf.pts,w:tf.w,n:[nme,nme,nme]};
   if(S.mode==='wizard'){ S.wiz.sel[S.wiz.ki].push({...item,on:true}) }
   else { const k=kid(S.ui.taskKid)||cur(); k.tasks.push({...item,st:'open'}); logIt(`+ ${nme} → ${k.name}`) }
@@ -654,7 +684,9 @@ function wizardHTML(){
     body=`<h2>${t('kidsTitle')}</h2><p class="lead">${t('kidsSub')}</p>`+
       w.kids.map((k,i)=>`<div class="card">
         <div class="row"><input class="inp" style="flex:1" value="${k.name}" placeholder="${t('kidName')}" oninput="wKidName(${i},this.value)">
-        ${w.kids.length>1?`<button class="del-x" onclick="wDelKid(${i})" aria-label="${t('del')}">✕</button>`:''}</div>
+        ${w.kids.length>1?(w.delKid===i
+          ? `<button class="btn btn-coral btn-sm" onclick="wDelKid(${i})">${['متأكد؟','تأكيد','Sure?'][LI]}</button>`
+          : `<button class="del-x" onclick="wDelKid(${i})" aria-label="${t('del')}">✕</button>`):''}</div>
         <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
           <select class="sel" onchange="wKidAge(${i},this.value)">${Array.from({length:15},(_,n)=>n+2).map(a=>`<option value="${a}"${k.age===a?' selected':''}>${a} ${yearsW(a)}</option>`).join('')}</select>
           <div class="gpill"><button class="${k.g==='boy'?'on':''}" onclick="wKidG(${i},'boy')">👦 ${t('boy')}</button>
@@ -694,7 +726,8 @@ function wizardHTML(){
       sel.map(x=>`<div class="card row" style="${x.on?'':'opacity:.55'}">
         <button class="cbx${x.on?' on':''}" onclick="wItem('${x.id}')" aria-label="${nm(x)}">${x.on?'✓':''}</button>
         <div class="ico">${x.ico}</div><div class="grow"><p class="t-name" style="font-size:13.5px">${nm(x)}</p>
-        <p class="t-sub">${freqLabel(x.w)}</p></div>
+        <p class="t-sub">${freqLabel(x.w)} · ${['أقصى','بحد أقصى','max'][LI]} ${Math.max(1,Math.round(x.w*periodF()))} × ${x.pts}</p></div>
+        <button class="del-x" onclick="wDelItem('${x.id}')">✕</button>
         <div class="stepper"><button onclick="wBump('${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="wBump('${x.id}',1)">+</button></div></div>`).join('')+
       tfForm()+
       `<div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">💡 ${t('possibleWeek',wPoss(w.ki))}</p></div>`;
@@ -736,7 +769,8 @@ function rwfOpen(){ Object.assign(rwf,{on:true,name:'',ico:'🎁',cost:50}); ren
 function rwfName(v){ rwf.name=v } function rwfIco(i){ rwf.ico=i; render() }
 function rwfCost(d){ rwf.cost=Math.max(5,rwf.cost+d*5); render() }
 function rwfSave(inWiz){
-  const nme=rwf.name.trim()||t('addRw');
+  if(!rwf.name.trim()){ toast(['اكتب اسم المكافأة الأول','أدخل اسم المكافأة أولًا','Enter a reward name first'][LI]); return }
+  const nme=rwf.name.trim();
   const item={id:'r'+(seq++),ico:rwf.ico,cost:rwf.cost,n:[nme,nme,nme]};
   if(inWiz) S.wiz.rw.push({...item,on:true}); else { S.rewards.push(item); logIt('🎁 + '+nme) }
   rwf.on=false; render();
@@ -782,7 +816,8 @@ function switcherHTML(){
     <div class="who-grid">
       ${kids.map(k=>`<button class="who-card" onclick="pickKid('${k.id}')">
         <div class="big">${k.av}</div><p class="nm">${k.name}</p>
-        <p class="sub">${k.pin?'🔒 '+t('enterPin'):k.age+' '+yearsW(k.age)}</p></button>`).join('')}
+        <p class="sub">${k.pin?'🔒 '+t('enterPin')
+          :`<span style="color:var(--coral);font-weight:700">⚠️ ${['محتاج رقم سري','يحتاج رقمًا سريًا','Needs a PIN'][LI]}</span>`}</p></button>`).join('')}
       <button class="who-card par" onclick="pickParent()">
         <div class="big">👨‍👩‍👧</div><p class="nm">${t('parentArea')}</p>
         <p class="sub">${S.parentPin?'🔒 ':''}${t('manageAll')}</p></button>
@@ -821,26 +856,24 @@ const RJ=[['ما اتعملتش كاملة','لم تُنفذ بالكامل','No
   ['اتعملت بعد المعاد','نُفذت بعد الموعد','Done after the deadline'],
   ['سبب تاني','سبب آخر','Other reason']];
 
+const PR_NAMES=[['الفجر','الظهر','العصر','المغرب','العشا'],['الفجر','الظهر','العصر','المغرب','العشاء'],['Fajr','Dhuhr','Asr','Maghrib','Isha']];
+function prayLabel(i){ return [`الصلاة (${PR_NAMES[0][i]})`,`الصلاة (${PR_NAMES[1][i]})`,`Prayer (${PR_NAMES[2][i]})`] }
 function submitTask(kidId,taskId){
-  const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk||tk.st!=='open')return;
-  tk.st='pending';
-  S.pending.push({id:'q'+(seq++),kidId,taskId,pts:tk.pts,ico:tk.ico,n:tk.n});
+  const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk)return;
+  if(leftOf(kidId,tk)<=0)return;
+  delete tk.rej;
+  const label = tk.type==='prayer' ? prayLabel((doneOf(tk)+pendCountTask(kidId,taskId))%5) : tk.n;
+  S.pending.push({id:'q'+(seq++),kidId,taskId,pts:tk.pts,ico:tk.ico,n:label});
+  if(S.role==='child') logIt(`📨 ${nm({n:label})} · ${k.name}`);
   render();
 }
-function prayBead(kidId){
-  const k=kid(kidId), p=k.tasks.find(x=>x.type==='prayer'); if(!p||p.prayers>=5)return;
-  p.prayers++;
-  const names=[['الفجر','الظهر','العصر','المغرب','العشا'],['الفجر','الظهر','العصر','المغرب','العشاء'],['Fajr','Dhuhr','Asr','Maghrib','Isha']];
-  const w=(names[LI]||names[1])[p.prayers-1];
-  S.pending.push({id:'q'+(seq++),kidId,taskId:'pray',pts:p.pts,ico:'🕌',n:[`الصلاة (${w})`,`الصلاة (${w})`,`Prayer (${w})`]});
-  render();
-}
+function prayBead(kidId){ const k=kid(kidId),p=k.tasks.find(x=>x.type==='prayer'); if(p) submitTask(kidId,p.id) }
 function approve(id){
   const i=S.pending.findIndex(p=>p.id===id); if(i<0)return;
   const p=S.pending[i]; S.pending.splice(i,1);
   const k=kid(p.kidId); if(!k)return;
   k.week+=p.pts; S.quest.prog=Math.min(S.quest.total,S.quest.prog+p.pts);
-  const tk=k.tasks.find(x=>x.id===p.taskId); if(tk&&tk.type!=='prayer') tk.st='approved';
+  const tk=k.tasks.find(x=>x.id===p.taskId); if(tk){ tk.done=doneOf(tk)+1; delete tk.rej }
   logIt(`✓ ${nm(p)} · ${k.name} +${p.pts}`);
   toast(`✓ ${nm(p)} +${p.pts}`);
 }
@@ -849,28 +882,25 @@ function rejectWith(id,reason){
   const i=S.pending.findIndex(p=>p.id===id); if(i<0)return;
   const p=S.pending[i]; S.pending.splice(i,1); S.ui.rejecting=null;
   const k=kid(p.kidId); const tk=k&&k.tasks.find(x=>x.id===p.taskId);
-  if(tk&&tk.type!=='prayer'){ tk.st='rejected'; tk.rej=reason }
+  if(tk) tk.rej=reason;
   logIt(`✕ ${nm(p)} · ${k?k.name:''} — ${reason}`);
   toast(`✕ ${reason}`);
 }
-function retry(kidId,taskId){ const k=kid(kidId),tk=k.tasks.find(x=>x.id===taskId); if(tk){tk.st='open';delete tk.rej} render() }
+function retry(kidId,taskId){ const k=kid(kidId),tk=k.tasks.find(x=>x.id===taskId); if(tk)delete tk.rej; render() }
 
 /* parent records directly for a child (works for every child, phone or not) */
 function parentRecord(kidId,taskId){
   const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk)return;
-  if(tk.type==='prayer'){ if(tk.prayers>=5)return; tk.prayers++; k.week+=tk.pts;
-    S.quest.prog=Math.min(S.quest.total,S.quest.prog+tk.pts); logIt(`✓ ${nm(tk)} · ${k.name} +${tk.pts}`); render(); return }
-  if(tk.st==='approved')return;
-  const wasPending=tk.st==='pending';
-  if(wasPending){ const i=S.pending.findIndex(p=>p.kidId===kidId&&p.taskId===taskId); if(i>=0)S.pending.splice(i,1) }
-  tk.st='approved'; delete tk.rej; k.week+=tk.pts;
+  if(doneOf(tk)>=capOf(tk))return;
+  const i=S.pending.findIndex(p=>p.kidId===kidId&&p.taskId===taskId);
+  if(i>=0) S.pending.splice(i,1);
+  tk.done=doneOf(tk)+1; delete tk.rej; k.week+=tk.pts;
   S.quest.prog=Math.min(S.quest.total,S.quest.prog+tk.pts);
   logIt(`✓ ${nm(tk)} · ${k.name} +${tk.pts}`); render();
 }
 function parentUndo(kidId,taskId){
-  const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk)return;
-  if(tk.type==='prayer'){ if(tk.prayers>0){ tk.prayers--; k.week-=tk.pts; S.quest.prog=Math.max(0,S.quest.prog-tk.pts) } }
-  else if(tk.st==='approved'){ tk.st='open'; k.week-=tk.pts; S.quest.prog=Math.max(0,S.quest.prog-tk.pts) }
+  const k=kid(kidId), tk=k.tasks.find(x=>x.id===taskId); if(!tk||doneOf(tk)<=0)return;
+  tk.done=doneOf(tk)-1; k.week-=tk.pts; S.quest.prog=Math.max(0,S.quest.prog-tk.pts);
   logIt(`↩ ${nm(tk)} · ${k.name}`); render();
 }
 function doDeduct(kidId,bid){
@@ -884,22 +914,26 @@ function startAppeal(id){ S.ui.appealing=(S.ui.appealing===id?null:id); render()
 function sendAppeal(kidId,id){
   const k=kid(kidId), d=k.deductions.find(x=>x.id===id); if(!d)return;
   const el=document.getElementById('appealInp');
-  const msg=(el&&el.value.trim())||['مش عادل 🙁','غير عادل 🙁','That’s not fair 🙁'][LI];
+  const msg=(el&&el.value.trim())||'';
+  if(msg.length<3){ toast(['اكتب سببك الأول عشان بابا وماما يفهموا','اكتب سببك أولًا ليفهم والداك','Write your reason so your parents understand'][LI]); return }
   d.appeal={msg,st:'open'}; S.ui.appealing=null;
+  logIt(`🙋 ${nm(d)} · ${k.name}`);
   toast(['🙋 اعتراضك وصل','🙋 وصل اعتراضك','🙋 Your appeal was sent'][LI]);
 }
 function decideAppeal(kidId,id,v){
   const k=kid(kidId), d=k.deductions.find(x=>x.id===id); if(!d||!d.appeal)return;
+  const W={cancelled:['أُلغي','أُلغي','cancelled'],reduced:['خُفّض للنص','خُفّض للنصف','halved'],kept:['ثُبّت','ثُبّت','kept']};
   if(v==='cancel'){ k.week+=d.pts; d.st='cancelled'; toast(['↩️ اتلغى الخصم','↩️ أُلغي الخصم','↩️ Deduction cancelled'][LI]) }
   else if(v==='half'){ const b=Math.ceil(d.pts/2); k.week+=b; d.pts-=b; d.st='reduced'; toast(['⚖️ اتخفض للنص','⚖️ خُفّض للنصف','⚖️ Halved'][LI]) }
   else { d.st='kept'; toast(['تم التثبيت','تم التثبيت','Kept as is'][LI]) }
-  d.appeal.st='closed'; logIt(`⚖️ ${nm(d)} · ${k.name} → ${d.st}`);
+  d.appeal.st='closed'; logIt(`⚖️ ${nm(d)} · ${k.name} → ${W[d.st][LI]||W[d.st][1]}`);
 }
 /* rewards */
 function askReward(kidId,rwId){
   const k=kid(kidId), r=S.rewards.find(x=>x.id===rwId); if(!r)return;
   if(availOf(k)<r.cost)return;
   S.rewardReqs.push({id:'q'+(seq++),kidId,rwId,st:'asked'});
+  logIt(`🎁 ${['طلب','طلب','requested'][LI]} ${nm(r)} · ${k.name}`);
   toast(['📨 اتبعت الطلب','📨 أُرسل الطلب','📨 Request sent'][LI]);
 }
 function decideReward(id,ok){
@@ -925,12 +959,15 @@ function exSave(kidId){
 }
 /* period close */
 function closePeriod(kidId){
-  const k=kid(kidId), net=k.week, hit=net>=k.target, bonus=hit?Math.round(net*S.bonusPct/100):0;
+  const k=kid(kidId);
+  const active=k.week!==0||k.tasks.some(x=>doneOf(x)>0)||(k.deductions||[]).length>0;
+  if(!active){ S.ui.closing=null; toast(['مفيش حاجة تتقفل — الفترة لسه فاضية','لا شيء لإغلاقه — الفترة فارغة','Nothing to close — the period is empty'][LI]); return }
+  const net=k.week, hit=net>=k.target, bonus=hit?Math.round(net*S.bonusPct/100):0;
   if(net>0) k.wallet+=net+bonus;
   if(hit) k.lvl=(k.lvl||1)+1;
   k.lastClose={net,bonus,hit,target:k.target};
   k.week=0; k.deductions=[];
-  k.tasks.forEach(x=>{ if(x.type==='prayer') x.prayers=0; else { x.st='open'; delete x.rej } });
+  k.tasks.forEach(x=>{ x.done=0; delete x.rej });
   S.pending=S.pending.filter(p=>p.kidId!==kidId);
   logIt(`🏁 ${k.name} — ${net}/${k.lastClose.target}${hit?' 🏆':''}`);
   S.ui.panel=null; S.ui.closing=null;
@@ -947,28 +984,53 @@ function confetti(){
 }
 /* settings mutations */
 function bumpTask(kidId,id,d){ const k=kid(kidId),x=k.tasks.find(a=>a.id===id); x.pts=Math.max(1,x.pts+d); render() }
-function delTask(kidId,id){ const k=kid(kidId); k.tasks=k.tasks.filter(a=>a.id!==id); render() }
+function delTask(kidId,id){
+  if(S.ui.delTask!==kidId+id){ S.ui.delTask=kidId+id; render(); return }
+  const k=kid(kidId), tk=k.tasks.find(a=>a.id===id);
+  k.tasks=k.tasks.filter(a=>a.id!==id);
+  S.pending=S.pending.filter(p=>!(p.kidId===kidId&&p.taskId===id));
+  S.ui.delTask=null; if(tk)logIt(`🗑 ${nm(tk)} · ${k.name}`); render();
+}
 function bumpBeh(id,d){ const b=S.behaviors.find(x=>x.id===id); b.pts=Math.max(1,b.pts+d); render() }
 function bumpTargetK(kidId,d){ const k=kid(kidId); k.target=Math.max(5,k.target+d*5); render() }
 function bumpBonus(d){ S.bonusPct=Math.min(50,Math.max(0,S.bonusPct+d*5)); render() }
-function setPeriod(p){ S.period=p; render() }
+function setPeriod(p){
+  S.period=p;
+  S.kids.forEach(k=>{ const mx=possible(k); if(k.target>mx) k.target=Math.max(5,Math.round(mx*0.75/5)*5) });
+  toast([`الفترة بقت ${t(p)} — راجع الأهداف`,`أصبحت الفترة ${t(p)} — راجع الأهداف`,`Period set to ${t(p)} — review the targets`][LI]);
+}
 function setNotif(id,m){ S.notifs.find(n=>n.id===id).mode=m; render() }
 function bumpRw(id,d){ const r=S.rewards.find(x=>x.id===id); r.cost=Math.max(5,r.cost+d*5); render() }
-function delRw(id){ S.rewards=S.rewards.filter(x=>x.id!==id); S.rewardReqs=S.rewardReqs.filter(q=>q.rwId!==id); render() }
+function delRw(id){
+  if(S.ui.delRw!==id){ S.ui.delRw=id; render(); return }
+  const r=S.rewards.find(x=>x.id===id);
+  S.rewards=S.rewards.filter(x=>x.id!==id);
+  S.rewardReqs=S.rewardReqs.filter(q=>q.rwId!==id);
+  S.kids.forEach(k=>{ if(k.goalRw===id)k.goalRw=null });
+  S.ui.delRw=null; if(r)logIt(`🗑 ${nm(r)}`); render();
+}
 function togglePack(id){ const p=S.packs.find(x=>x.id===id); p.on=!p.on; render() }
 function toggleFeature(k){ S.features[k]=!S.features[k];
   if(k==='stories'&&!S.features.stories&&S.childTab==='stories') S.childTab='today'; render() }
 function setKidPin(kidId,v){
   const k=kid(kidId), p=(v||'').replace(/\D/g,'');
-  if(p.length&&p.length<4){ toast(['٤ أرقام على الأقل','٤ أرقام على الأقل','At least 4 digits'][LI]); return }
-  k.pin=p; logIt(`🔑 ${k.name}`); toast(p?'🔑 '+k.name:['اتشال الرقم','أُزيل الرقم','PIN removed'][LI]);
+  if(p.length<4){ toast(['اكتب ٤ أرقام على الأقل','أدخل ٤ أرقام على الأقل','Enter at least 4 digits'][LI]); return }
+  if(S.kids.some(o=>o.id!==kidId&&o.pin===p)){ toast(['الرقم ده مع طفل تاني — اختار غيره','هذا الرقم لطفل آخر — اختر غيره','Another child uses that PIN'][LI]); return }
+  if(p===S.parentPin){ toast(['ده رقم بابا وماما — اختار غيره','هذا رقم ولي الأمر — اختر غيره','That’s the parent PIN'][LI]); return }
+  k.pin=p; logIt(`🔑 ${k.name}`); toast('🔑 '+k.name);
 }
 function setParentPin(v){
   const p=(v||'').replace(/\D/g,'');
-  if(p.length<4){ toast(['٤ أرقام على الأقل','٤ أرقام على الأقل','At least 4 digits'][LI]); return }
+  if(p.length<4){ toast(['اكتب ٤ أرقام على الأقل','أدخل ٤ أرقام على الأقل','Enter at least 4 digits'][LI]); return }
+  if(S.kids.some(o=>o.pin===p)){ toast(['الرقم ده مع طفل — اختار غيره','هذا الرقم لأحد الأطفال — اختر غيره','A child uses that PIN'][LI]); return }
   S.parentPin=p; unlocked=true; save(); toast('🔒 '+t('parentPinL'));
 }
-function toggleKidApp(kidId){ const k=kid(kidId); k.usesApp=!k.usesApp; if(!k.usesApp)k.pin=''; render() }
+function toggleKidApp(kidId){
+  const k=kid(kidId); k.usesApp=!k.usesApp;
+  if(!k.usesApp) k.pin='';
+  else toast(['حدد رقم سري لـ'+k.name+' من تحت 👇','حدد رقمًا سريًا لـ'+k.name+' بالأسفل 👇','Set a PIN for '+k.name+' below 👇'][LI]);
+  render();
+}
 /* ================= child screens ================= */
 function mascotSVG(k,sz){
   const lvl=k.lvl||1;
@@ -985,31 +1047,36 @@ function mascotBlock(k){ return S.features.mascot
   ? `<div class="side-el">${mascotSVG(k,60)}<div class="mascot-chip">${['كنزي','كنزي','Kenzi'][LI]} · ${['مستوى','مستوى','Lv'][LI]} ${k.lvl||1}</div></div>` : '' }
 
 function taskRow(k,x,parentMode){
+  const cap=capOf(x), dn=doneOf(x), pn=pendCountTask(k.id,x.id), left=cap-dn-pn;
+  const allDone=dn>=cap;
+  const counter=`<span class="num">${dn}/${cap}</span>`;
+  const rej=x.rej?`<p class="t-sub" style="color:var(--coral)">${['السبب','السبب','Reason'][LI]}: ${x.rej}</p>`:'';
+
   if(x.type==='prayer'){
-    let b=''; for(let i=0;i<5;i++) b+=`<span class="bead${i<x.prayers?' on':''}"></span>`;
-    const done=x.prayers>=5;
+    const inCycle=allDone?5:((dn+pn)%5||((dn+pn)>0&&(dn+pn)%5===0?5:0));
+    let b=''; for(let i=0;i<5;i++) b+=`<span class="bead${i<inCycle?' on':''}"></span>`;
     const act=parentMode
-      ? `<div class="row" style="gap:5px">${x.prayers>0?`<button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','pray')">↩</button>`:''}
-         ${done?`<span class="stamp ok">✓</span>`:`<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','pray')">+1 ✓</button>`}</div>`
-      : (done?`<span class="stamp ok">${['ما شاء الله ✓','ما شاء الله ✓','Mashallah ✓'][LI]}</span>`
-             :`<button class="btn btn-teal" onclick="prayBead('${k.id}')">${['صليت ✓','صليت ✓','Prayed ✓'][LI]}</button>`);
+      ? `<div class="row" style="gap:5px">${dn>0?`<button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','${x.id}')">↩</button>`:''}
+         ${allDone?`<span class="stamp ok">✓</span>`:`<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','${x.id}')">+1 ✓</button>`}</div>`
+      : (allDone?`<span class="stamp ok">${['ما شاء الله ✓','ما شاء الله ✓','Mashallah ✓'][LI]}</span>`
+        : left<=0?`<span class="stamp">${['مستني بابا ⏳','بانتظار الاعتماد ⏳','Waiting ⏳'][LI]}</span>`
+        :`<button class="btn btn-teal" onclick="prayBead('${k.id}')">${['صليت ✓','صليت ✓','Prayed ✓'][LI]}</button>`);
     return `<div class="card row"><div class="ico">🕌</div><div class="grow">
-      <p class="t-name">${nm(x)}</p><div class="beads">${b}</div></div>${act}</div>`;
+      <p class="t-name">${nm(x)} <span class="t-sub">${counter}</span></p><div class="beads">${b}</div>${rej}</div>${act}</div>`;
   }
   let act;
   if(parentMode){
-    act = x.st==='approved'
-      ? `<div class="row" style="gap:5px"><span class="stamp ok num">+${x.pts}</span><button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','${x.id}')">↩</button></div>`
-      : `<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','${x.id}')">${['سجّلها ✓','سجّلها ✓','Record ✓'][LI]}</button>`;
+    act=`<div class="row" style="gap:5px">${dn>0?`<button class="btn btn-ghost btn-sm" onclick="parentUndo('${k.id}','${x.id}')">↩</button>`:''}
+      ${allDone?`<span class="stamp ok num">✓ ${dn}/${cap}</span>`
+        :`<button class="btn btn-teal btn-sm" onclick="parentRecord('${k.id}','${x.id}')">${['سجّلها ✓','سجّلها ✓','Record ✓'][LI]}</button>`}</div>`;
   } else {
-    if(x.st==='open') act=`<button class="btn btn-teal" onclick="submitTask('${k.id}','${x.id}')">${t('done')} ✓</button>`;
-    else if(x.st==='pending') act=`<span class="stamp">${['مستني بابا ⏳','بانتظار الاعتماد ⏳','Waiting ⏳'][LI]}</span>`;
-    else if(x.st==='approved') act=`<span class="stamp ok num">+${x.pts} ✓</span>`;
-    else act=`<button class="btn btn-coral" onclick="retry('${k.id}','${x.id}')">${['حاول تاني ↻','حاول مجددًا ↻','Try again ↻'][LI]}</button>`;
+    if(allDone) act=`<span class="stamp ok num">✓ ${dn}/${cap}</span>`;
+    else if(left<=0) act=`<span class="stamp">${['مستني بابا ⏳','بانتظار الاعتماد ⏳','Waiting ⏳'][LI]}</span>`;
+    else if(x.rej) act=`<button class="btn btn-coral" onclick="submitTask('${k.id}','${x.id}')">${['حاول تاني ↻','حاول مجددًا ↻','Try again ↻'][LI]}</button>`;
+    else act=`<button class="btn btn-teal" onclick="submitTask('${k.id}','${x.id}')">${t('done')} ✓</button>`;
   }
-  const rej=x.st==='rejected'&&x.rej?`<p class="t-sub" style="color:var(--coral)">${['السبب','السبب','Reason'][LI]}: ${x.rej}</p>`:'';
   return `<div class="card row"><div class="ico">${x.ico}</div><div class="grow">
-    <p class="t-name">${nm(x)}</p><p class="t-sub"><b>+${x.pts}</b> · ${freqLabel(x.w)}</p>${rej}</div>${act}</div>`;
+    <p class="t-name">${nm(x)}</p><p class="t-sub"><b>+${x.pts}</b> · ${freqLabel(x.w)} · ${counter}${pn?` · +${pn} ⏳`:''}</p>${rej}</div>${act}</div>`;
 }
 
 function childToday(){
@@ -1023,7 +1090,7 @@ function childToday(){
 
     <div class="float-card"><div class="row" style="justify-content:space-between;margin-bottom:8px">
       <span class="small muted" style="font-weight:700">${['هدف الفترة','هدف الفترة','Period target'][LI]}</span>
-      <span class="num" style="font-weight:800"><span style="color:var(--gold-deep);font-size:20px">${Math.max(0,k.week)}</span> / ${k.target}
+      <span class="num" style="font-weight:800"><span style="color:${k.week<0?'var(--coral)':'var(--gold-deep)'};font-size:20px">${k.week}</span> / ${k.target}
       ${pend?` <span style="color:var(--ink-soft);font-size:13px">+${pend} ⏳</span>`:''}</span></div>
     <div class="bar"><i style="width:${pct(Math.max(0,k.week),k.target)}%"></i></div>
     <p class="small muted" style="margin:8px 0 0">${hit
@@ -1035,8 +1102,11 @@ function childToday(){
       <div class="bar" style="margin-top:6px"><i style="width:${pct(S.quest.prog,S.quest.total)}%;background:linear-gradient(90deg,#F4B93C,#FFD98A)"></i></div>
       <p class="t-sub" style="margin-top:5px">${['كل العيلة جمعت','جمعت العائلة','The family collected'][LI]} <b>${S.quest.prog}</b> / ${S.quest.total} 🤝</p></div></div></div>`:''}
 
-    <div class="sec"><p class="sec-t">${['مهام النهارده','مهام اليوم','Today’s tasks'][LI]}</p>
-    ${k.tasks.filter(x=>S.features.religious||x.type!=='prayer').map(x=>taskRow(k,x,false)).join('')}</div>
+    <div class="sec"><p class="sec-t">${['مهامي','مهامي','My tasks'][LI]}</p>
+    ${k.tasks.filter(x=>S.features.religious||x.type!=='prayer').length
+      ? k.tasks.filter(x=>S.features.religious||x.type!=='prayer').map(x=>taskRow(k,x,false)).join('')
+      : `<div class="card" style="text-align:center;padding:20px"><div style="font-size:30px">🌤️</div>
+         <p class="t-sub" style="margin-top:6px">${['مفيش مهام لسه — بابا وماما هيضيفوا قريب','لا توجد مهام بعد — سيضيفها والداك قريبًا','No tasks yet — your parents will add some soon'][LI]}</p></div>`}</div>
 
     ${deds.length?`<div class="sec"><p class="sec-t">${['خصومات الفترة','خصومات الفترة','This period’s deductions'][LI]}</p>
       ${deds.map(d=>{
@@ -1064,12 +1134,15 @@ function childWallet(){
     <div class="float-card" style="text-align:center"><p class="small muted" style="margin:0;font-weight:700">${['رصيدي','رصيدي','My balance'][LI]}</p>
       <p class="num" style="font-size:37px;font-weight:800;margin:2px 0;color:var(--gold-deep)">${k.wallet}</p>
       <p class="small muted" style="margin:0">${['اللي دخل كنزك بقى ملكك 😉','ما دخل كنزك أصبح ملكك 😉','What enters your treasure is yours 😉'][LI]}</p>
-      ${heldOf(k.id)?`<p class="small" style="margin:6px 0 0;color:var(--gold-deep);font-weight:700">${heldOf(k.id)} ${['مستنية قرار','بانتظار القرار','on hold'][LI]} ⏳</p>`:''}</div>
+      ${heldOf(k.id)?`<p class="small" style="margin:6px 0 0;color:var(--gold-deep);font-weight:700">${heldOf(k.id)} ${['مستنية قرار','بانتظار القرار','on hold'][LI]} ⏳</p>`:''}
+      ${k.week>0?`<p class="small" style="margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--line);color:var(--ink-soft)">
+        ${['💡 عندك','💡 لديك','💡 You have'][LI]} <b class="num" style="color:var(--gold-deep)">${k.week}</b>
+        ${['نقطة في الفترة دي — هتدخل كنزك لما الفترة تخلص','نقطة في هذه الفترة — ستنتقل إلى كنزك عند انتهائها','points this period — they enter your treasure when it ends'][LI]}</p>`:''}</div>
 
     ${S.features.jar?`<div class="sec"><p class="sec-t">🎯 ${['برطمان الادخار','جرة الادخار','Savings jar'][LI]}</p>
       ${goal?`<div class="card row" style="gap:15px"><div class="jar"><i style="height:${p}%"></i><span class="pct num">${p}%</span></div>
         <div class="grow"><p class="t-name">${goal.ico} ${nm(goal)}</p>
-        <p class="t-sub num">${['هدفي','هدفي','Goal'][LI]}: ${goal.cost} · ${['معايا','لديّ','have'][LI]} ${k.wallet}</p>
+        <p class="t-sub num">${['هدفي','هدفي','Goal'][LI]}: ${goal.cost} · ${['المتاح','المتاح','available'][LI]} ${availOf(k)}</p>
         <p class="t-sub" style="margin-top:4px">${['باقي','بقي','Need'][LI]} <b>${Math.max(0,goal.cost-k.wallet)}</b> 💪</p>
         <button class="btn btn-ghost btn-sm" style="margin-top:7px" onclick="setGoal('${k.id}',null)">${['غيّر الهدف','تغيير الهدف','Change goal'][LI]}</button></div></div>`
       :`<div class="card" style="text-align:center"><p class="t-sub" style="margin:0 0 9px">${['اختار مكافأة تدخّر ليها','اختر مكافأة تدّخر لها','Pick a reward to save for'][LI]}</p>
@@ -1173,7 +1246,7 @@ function panelFor(k){
       ${S.behaviors.map(b=>`<div class="card row"><div class="ico">${b.ico}</div><div class="grow">
         <p class="t-name">${nm(b)}</p><p class="t-sub num" style="color:var(--coral)">−${b.pts}</p></div>
         <button class="btn btn-coral btn-sm" onclick="doDeduct('${k.id}','${b.id}')">${['سجّل','تسجيل','Record'][LI]}</button></div>`).join('')}
-      <button class="btn btn-ghost" style="width:100%" onclick="S.ui.panel=null;render()">${t('cancel')}</button></div>`;
+      <button class="btn btn-ghost" style="width:100%" onclick="S.ui.panel=null;render()">${['اقفل','إغلاق','Close'][LI]}</button></div>`;
   }
   if(p==='ex'){
     return `<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
@@ -1211,7 +1284,16 @@ function parentFamily(){
             ? `<button class="btn btn-teal btn-sm" onclick="closePeriod('${k.id}')">${['متأكد — أغلق ✓','تأكيد الإغلاق ✓','Confirm close ✓'][LI]}</button>
                <button class="btn btn-ghost btn-sm" onclick="S.ui.closing=null;render()">${t('cancel')}</button>`
             : `<button class="btn btn-ghost btn-sm" onclick="S.ui.closing='${k.id}';render()">🏁 ${['أغلق الفترة','إغلاق الفترة','Close period'][LI]}</button>`}
-        </div>${panelFor(k)}</div>`;
+        </div>
+        ${S.ui.closing===k.id?`<div class="card" style="margin:9px 0 0;background:var(--chip);border:0">
+          <p class="t-sub" style="margin:0">${pendOf(k.id).length
+            ? `⚠️ ${[`فيه ${pendOf(k.id).length} طلبات مستنية (${pendPts(k.id)} نقطة) هتتلغي لو قفلت دلوقتي — راجعها الأول.`,
+                    `هناك ${pendOf(k.id).length} طلبات معلّقة (${pendPts(k.id)} نقطة) ستُلغى إذا أغلقت الآن — راجعها أولًا.`,
+                    `${pendOf(k.id).length} pending requests (${pendPts(k.id)} pts) will be dropped if you close now — review them first.`][LI]}`
+            : [`النتيجة ${k.week} هتروح للمحفظة${k.week>=k.target?` + بونص ${Math.round(k.week*S.bonusPct/100)} 🏆`:''}، وتبدأ فترة جديدة من الصفر.`,
+               `ستنتقل النتيجة ${k.week} إلى المحفظة${k.week>=k.target?` + مكافأة ${Math.round(k.week*S.bonusPct/100)} 🏆`:''}، وتبدأ فترة جديدة.`,
+               `${k.week} points go to the wallet${k.week>=k.target?` + ${Math.round(k.week*S.bonusPct/100)} bonus 🏆`:''}, and a new period starts.`][LI]}</p></div>`:''}
+        ${panelFor(k)}</div>`;
     }).join('')}</div>
 
     ${S.features.quest?`<div class="sec"><p class="sec-t">${['مهمة العيلة','مهمة العائلة','Family quest'][LI]}</p>
@@ -1248,7 +1330,7 @@ function parentApprove(){
         <div class="row" style="margin-top:9px;gap:6px">
         <button class="btn btn-ghost grow btn-sm" onclick="decideAppeal('${k.id}','${d.id}','keep')">${['تثبيت','تثبيت','Keep'][LI]}</button>
         <button class="btn btn-gold grow btn-sm" onclick="decideAppeal('${k.id}','${d.id}','half')">${['تخفيض ½','تخفيض ½','Halve'][LI]}</button>
-        <button class="btn btn-teal grow btn-sm" onclick="decideAppeal('${k.id}','${d.id}','cancel')">${['إلغاء','إلغاء','Cancel'][LI]}</button></div></div>`).join('')}</div>`:''}
+        <button class="btn btn-teal grow btn-sm" onclick="decideAppeal('${k.id}','${d.id}','cancel')">${['شيل الخصم','إلغاء الخصم','Remove it'][LI]}</button></div></div>`).join('')}</div>`:''}
 
     ${(asked.length||todo.length)?`<div class="sec"><p class="sec-t">🎁 ${['طلبات المكافآت','طلبات المكافآت','Reward requests'][LI]}</p>
       ${asked.map(q=>{const k=kid(q.kidId),r=S.rewards.find(x=>x.id===q.rwId); if(!k||!r)return'';
@@ -1282,13 +1364,13 @@ function parentReports(){
     <div class="sec"><p class="sec-t">${['أرقام الفترة','أرقام الفترة','Period numbers'][LI]}</p>
       <div class="card row"><div class="ico">➕</div><div class="grow"><p class="t-name">${['نقاط معتمدة','نقاط معتمدة','Approved points'][LI]}</p></div><span class="stamp ok num">+${pos}</span></div>
       <div class="card row"><div class="ico">➖</div><div class="grow"><p class="t-name">${['خصومات','خصومات','Deductions'][LI]}</p>
-        <p class="t-sub">${(k.deductions||[]).filter(d=>d.st!=='cancelled').map(d=>nm(d)).join('، ')||['لا يوجد','لا يوجد','None'][LI]}</p></div><span class="stamp no num">−${ded}</span></div>
+        <p class="t-sub">${(k.deductions||[]).filter(d=>d.st!=='cancelled').map(d=>nm(d)).join(LI===2?', ':'، ')||['لا يوجد','لا يوجد','None'][LI]}</p></div><span class="stamp no num">−${ded}</span></div>
       <div class="card row"><div class="ico">🎯</div><div class="grow"><p class="t-name">${['نسبة الهدف','نسبة الهدف','Target progress'][LI]}</p>
         <p class="t-sub num">${Math.max(0,k.week)} / ${k.target}</p></div><span class="stamp num">${pct(Math.max(0,k.week),k.target)}%</span></div>
       ${doneT.length?`<div class="card row"><div class="ico">💪</div><div class="grow"><p class="t-name">${['اتعمل','أُنجز','Completed'][LI]}</p>
-        <p class="t-sub">${doneT.map(x=>nm(x)).slice(0,4).join('، ')}</p></div></div>`:''}
+        <p class="t-sub">${doneT.map(x=>nm(x)).slice(0,4).join(LI===2?', ':'، ')}</p></div></div>`:''}
       ${openT.length?`<div class="card row"><div class="ico">👀</div><div class="grow"><p class="t-name">${['لسه','لم يُنجز بعد','Still open'][LI]}</p>
-        <p class="t-sub">${openT.map(x=>nm(x)).slice(0,4).join('، ')}</p></div></div>`:''}
+        <p class="t-sub">${openT.map(x=>nm(x)).slice(0,4).join(LI===2?', ':'، ')}</p></div></div>`:''}
       ${k.lastClose?`<div class="card row"><div class="ico">🗓️</div><div class="grow"><p class="t-name">${['الفترة السابقة','الفترة السابقة','Last period'][LI]}</p>
         <p class="t-sub num">${k.lastClose.net} / ${k.lastClose.target}${k.lastClose.hit?' + 🏆 '+k.lastClose.bonus:''}</p></div></div>`:''}</div>
     <div class="sec"><p class="sec-t">${['اقتراح التطبيق','اقتراح التطبيق','App suggestion'][LI]}</p>
@@ -1324,7 +1406,10 @@ function parentSettings(){
     <div class="sec"><p class="sec-t">👧👦 ${['الأطفال والأرقام السرية','الأطفال والأرقام السرية','Children & PINs'][LI]}</p>
       ${S.kids.map(k=>`<div class="card"><div class="row"><div class="ico" style="font-size:22px">${k.av}</div><div class="grow">
         <p class="t-name">${k.name} · ${k.age} ${yearsW(k.age)}</p>
-        <p class="t-sub">${k.usesApp?(k.pin?'🔒 '+['بيدخل برقم سري','يدخل برقم سري','Signs in with a PIN'][LI]:['بيدخل من غير رقم','يدخل دون رقم','Signs in without a PIN'][LI]):'✍️ '+t('noAppKid')}</p></div>
+        <p class="t-sub">${k.usesApp
+          ?(k.pin?'🔒 '+['بيدخل برقم سري','يدخل برقم سري','Signs in with a PIN'][LI]
+            :`<span style="color:var(--coral);font-weight:700">⚠️ ${['حسابه مفتوح — حدد رقم','حسابه مفتوح — حدد رقمًا','Account open — set a PIN'][LI]}</span>`)
+          :'✍️ '+t('noAppKid')}</p></div>
         ${toggleH(k.usesApp,`toggleKidApp('${k.id}')`,k.name)}</div>
         ${k.usesApp?`<div class="row" style="margin-top:9px;gap:7px">
           <input class="inp" id="pin_${k.id}" inputmode="numeric" maxlength="6" placeholder="${k.pin?['غيّر الرقم','تغيير الرقم','Change PIN'][LI]:['حدد رقم','تعيين رقم','Set PIN'][LI]}" style="text-align:center;letter-spacing:6px">
@@ -1336,15 +1421,23 @@ function parentSettings(){
       ${S.kids.length>1?`<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px">
         ${S.kids.map(x=>`<button class="btn ${x.id===tk.id?'btn-teal':'btn-ghost'} btn-sm" onclick="S.ui.taskKid='${x.id}';render()">${x.av} ${x.name}</button>`).join('')}</div></div>`:''}
       ${tk.tasks.map(x=>`<div class="card row"><div class="ico">${x.ico}</div><div class="grow">
-        <p class="t-name" style="font-size:13.5px">${nm(x)}</p><p class="t-sub">${freqLabel(x.w)}</p></div>
+        <p class="t-name" style="font-size:13.5px">${nm(x)}</p><p class="t-sub">${freqLabel(x.w)} · ${['أقصى','بحد أقصى','max'][LI]} ${capOf(x)} × ${x.pts} = <b class="num">${capOf(x)*x.pts}</b></p></div>
         <div class="stepper"><button onclick="bumpTask('${tk.id}','${x.id}',-1)">−</button><span class="v num">+${x.pts}</span><button onclick="bumpTask('${tk.id}','${x.id}',1)">+</button></div>
-        <button class="del-x" onclick="delTask('${tk.id}','${x.id}')">✕</button></div>`).join('')}
+        ${S.ui.delTask===tk.id+x.id
+          ? `<button class="btn btn-coral btn-sm" onclick="delTask('${tk.id}','${x.id}')">${['متأكد؟','تأكيد','Sure?'][LI]}</button>`
+          : `<button class="del-x" onclick="delTask('${tk.id}','${x.id}')">✕</button>`}</div>`).join('')}
+      <div class="card row" style="background:var(--chip);border:0"><p class="t-sub grow" style="margin:0">
+        💡 ${['مجموع الممكن لـ'+tk.name,'مجموع الممكن لـ'+tk.name,'Total possible for '+tk.name][LI]}: <b class="num">${possible(tk)}</b>
+        · ${['الهدف','الهدف','target'][LI]} <b class="num">${tk.target}</b>
+        ${tk.target>possible(tk)?` <span style="color:var(--coral);font-weight:700">${['⚠️ الهدف أكبر من الممكن!','⚠️ الهدف أكبر من الممكن!','⚠️ Target exceeds what’s possible!'][LI]}</span>`:''}</p></div>
       ${(()=>{S.ui.taskKid=tk.id;return tfForm()})()}</div>
 
     <div class="sec"><p class="sec-t">🎁 ${['المكافآت','المكافآت','Rewards'][LI]}</p>
       ${S.rewards.map(r=>`<div class="card row"><div class="ico">${r.ico}</div><div class="grow"><p class="t-name">${nm(r)}</p></div>
         <div class="stepper"><button onclick="bumpRw('${r.id}',-1)">−</button><span class="v num">${r.cost}</span><button onclick="bumpRw('${r.id}',1)">+</button></div>
-        <button class="del-x" onclick="delRw('${r.id}')">✕</button></div>`).join('')}
+        ${S.ui.delRw===r.id
+          ? `<button class="btn btn-coral btn-sm" onclick="delRw('${r.id}')">${['متأكد؟','تأكيد','Sure?'][LI]}</button>`
+          : `<button class="del-x" onclick="delRw('${r.id}')">✕</button>`}</div>`).join('')}
       ${rwForm(false)}</div>
 
     <div class="sec"><p class="sec-t">➖ ${['السلوكيات والخصومات','السلوكيات والخصومات','Behaviours & deductions'][LI]}</p>
@@ -1402,9 +1495,18 @@ function parentNav(){
 function ceremonyHTML(){
   const k=kid(S.ceremonyKid)||cur(); if(!k)return'';
   const real=S.ceremonyReal&&k.lastClose;
-  const net=real?k.lastClose.net:Math.max(k.week,k.target)+5;
-  const bonus=real?k.lastClose.bonus:Math.round(net*S.bonusPct/100);
-  const hit=real?k.lastClose.hit:true;
+  const net=real?k.lastClose.net:Math.max(0,k.week);            // preview uses the child's REAL points
+  const bonus=real?k.lastClose.bonus:(net>=k.target?Math.round(net*S.bonusPct/100):0);
+  const hit=real?k.lastClose.hit:(net>=k.target);
+  if(!real&&!hit){
+    return `<div class="overlay">
+      <div class="pop" style="font-size:52px">🎯</div><h2>${['لسه بدري شوية!','ما زال أمامك بعض الطريق!','Not quite yet!'][LI]}</h2>
+      <p style="margin:0;opacity:.9;font-size:14px">${[`عندك ${net} من ${k.target}. لما توصل للهدف هتشوف الاحتفال الحقيقي 🏆`,
+        `لديك ${net} من ${k.target}. عند بلوغ الهدف سترى الاحتفال الحقيقي 🏆`,
+        `You have ${net} of ${k.target}. Hit the target to see the real celebration 🏆`][LI]}</p>
+      <div class="res"><div class="r"><span>${['باقي','بقي','To go'][LI]}</span><b class="num">${k.target-net}</b></div></div>
+      <button class="btn btn-gold" onclick="closeCeremony()">${['يلا نكمّل 💪','لنواصل 💪','Keep going 💪'][LI]}</button></div>`;
+  }
   if(real&&!hit){
     const close=net>=k.lastClose.target*0.5;
     return `<div class="overlay"><div class="confetti" id="cfbox"></div>

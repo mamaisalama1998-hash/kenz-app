@@ -277,6 +277,17 @@ const D={
  appLang:['لغة التطبيق','لغة التطبيق','App language'],
  langNote:['تقدر تغيرها في أي وقت من الإعدادات','يمكنك تغييرها في أي وقت من الإعدادات','You can change it anytime in settings'],
  famName:['اسم العائلة','اسم العائلة','Family name'],
+ yourData:['بياناتك','بياناتك','Your details'],
+ yourName:['اسمك','اسمك','Your name'],
+ yourNamePh:['مثال: محمد','مثال: محمد','e.g. Mohamed'],
+ yourEmail:['بريدك الإلكتروني','بريدك الإلكتروني','Your email'],
+ emailNote:['بيستخدم لاسترجاع حسابك لو ضاع','يُستخدم لاستعادة حسابك عند فقدانه','Used to recover your account if you lose it'],
+ youAre:['أنت مين في العيلة؟','أنت من في العائلة؟','You are'],
+ needName:['اكتب اسمك الأول','أدخل اسمك أولًا','Enter your name first'],
+ needEmail:['اكتب بريد إلكتروني صحيح','أدخل بريدًا إلكترونيًا صحيحًا','Enter a valid email'],
+ needRole:['اختار أنت مين','اختر دورك','Pick who you are'],
+ joinedTitle:['أهلًا بيك في العيلة!','أهلًا بك في العائلة!','Welcome to the family!'],
+ joinedSub:['عرّفنا بنفسك عشان يبان في سجل العيلة مين عمل إيه','عرّفنا بنفسك ليظهر في سجل العائلة من قام بماذا','Tell us who you are so the family log shows who did what'],
  famPh:['مثال: عائلة سلامة','مثال: عائلة سلامة','e.g. The Salama Family'],
  gotLink:['وصلك رابط عائلة؟','هل وصلك رابط عائلة؟','Got a family link?'],
  pasteLink:['الصق رابط العائلة هنا','الصق رابط العائلة هنا','Paste the family link here'],
@@ -384,11 +395,11 @@ const RW_SUGGEST=[
 const S={
   mode:'app', role:'parent', curKid:null, childTab:'today', parentTab:'family',
   lang:0, country:'EG', familyName:'', parentPin:'',
-  kids:[], rewards:[], rewardReqs:[], pending:[], audit:[], moves:[],
+  parents:[], kids:[], rewards:[], rewardReqs:[], pending:[], audit:[], moves:[],
   behaviors:[], notifs:[], followers:[], packs:[], features:{}, quest:{},
   period:'weekly', bonusPct:10, storyOpen:null, ui:{}
 };
-const SYNC=['lang','country','familyName','parentPin','kids','rewards','rewardReqs','pending','audit','moves',
+const SYNC=['lang','country','familyName','parentPin','parents','kids','rewards','rewardReqs','pending','audit','moves',
   'behaviors','notifs','followers','packs','features','quest','period','bonusPct'];
 
 function freshData(){
@@ -567,8 +578,10 @@ function joinFamily(v){
   syncSt='syncing'; syncChip(); toast(['🔄 بندوّر على العيلة…','🔄 جارٍ الاتصال بالعائلة…','🔄 Looking for that family…'][LI]);
   cloudPull(true).then(ok=>{
     if(ok&&S.kids&&S.kids.length){
-      S.mode='switch'; S.role='child'; startPoll();
-      toast(['🎉 اتوصلت بالعيلة!','🎉 تم الاتصال بالعائلة!','🎉 Connected to the family!'][LI]);
+      startPoll();
+      if(!myName){ S.mode='joinme'; S.jn=''; S.je=''; S.jr='' }
+      else { S.mode='switch'; S.role='child';
+        toast(['🎉 اتوصلت بالعيلة!','🎉 تم الاتصال بالعائلة!','🎉 Connected to the family!'][LI]) }
     } else if(ok){
       toast(['العيلة دي لسه فاضية — استنى صاحبها يخلص الإعداد','هذه العائلة فارغة — انتظر حتى يكتمل إعدادها','That family is still empty — wait until its setup is finished'][LI]);
       famToken=prev; save();
@@ -590,7 +603,7 @@ function recoverFamily(){
   });
 }
 function acceptJoin(){ famToken=S.pendingJoin; S.pendingJoin=null; lastDeclined=null; rev=0; unlocked=false; save();
-  cloudPull(true).then(ok=>{ S.mode=ok?'switch':'app'; if(ok)startPoll();
+  cloudPull(true).then(ok=>{ S.mode=ok?(myName?'switch':'joinme'):'app'; if(ok)startPoll();
     if(!ok)toast(['مفيش نت — جرب تاني','تعذّر الاتصال — أعد المحاولة','No connection — try again'][LI]); render() }) }
 function declineJoin(){ lastDeclined=S.pendingJoin; S.pendingJoin=null; S.mode='app'; save(); render();
   if(famToken){ cloudPull(); startPoll() } }
@@ -631,6 +644,7 @@ function startWizard(){
   if(S.parentPin&&!unlocked){ S.afterPin='wizard'; S.mode='pin'; S.pinFor='parent'; S.pinErr=false; render(); return }
   S.mode='wizard'; S.toast=null;
   S.wiz={step:1,country:S.country||'EG',lang:S.lang||0,family:'',pin:'',
+    pName:myName||'',pEmail:'',pRole:'',
     kids:[{name:'',age:8,g:'boy',av:'🦊',usesApp:true,pin:''}],
     religious:true,period:'weekly',ki:0,sel:[],selAge:[],
     rw:RW_SUGGEST.map(r=>({...r,on:['screen','movie','meal','play','big'].includes(r.id)})),
@@ -641,6 +655,10 @@ function startWizard(){
 function wCountry(c){ const o=COUNTRIES.find(x=>x.c===c); S.wiz.country=c; if(o){ S.wiz.lang=o.l; setLangW(o.l) } render() }
 function setLangW(l){ S.wiz.lang=l; S.lang=l; LI=l; applyDir() }
 function wFam(v){ S.wiz.family=v }
+function wPName(v){ S.wiz.pName=v }
+function wPEmail(v){ S.wiz.pEmail=v }
+function wPRole(r){ S.wiz.pRole=r; render() }
+function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e||'').trim()) }
 function wKidName(i,v){ S.wiz.kids[i].name=v }
 function wKidAge(i,v){ S.wiz.kids[i].age=parseInt(v,10); render() }
 function wKidG(i,g){ S.wiz.kids[i].g=g; render() }
@@ -687,7 +705,12 @@ function wSetTarget(i,v){ S.wiz.targets[i]=Math.max(5,Math.min(wPoss(i),v)); ren
 function wBonus(d){ S.wiz.bonus=Math.min(50,Math.max(0,S.wiz.bonus+d*5)); render() }
 function wNext(){
   const w=S.wiz;
-  if(w.step===1){ if(!w.family.trim()) w.family=['عيلتنا','عائلتنا','Our family'][LI]; w.step=2 }
+  if(w.step===1){
+    if(!(w.pName||'').trim()){ toast(t('needName')); return }
+    if(!validEmail(w.pEmail)){ toast(t('needEmail')); return }
+    if(!w.pRole){ toast(t('needRole')); return }
+    if(!w.family.trim()) w.family=['عيلتنا','عائلتنا','Our family'][LI];
+    w.step=2 }
   else if(w.step===2){
     const bad=w.kids.find(k=>k.usesApp&&(k.pin||'').length<4);
     if(bad){ toast([`${bad.name||'الطفل'} لازم رقم سري ٤ أرقام`,`${bad.name||'الطفل'} يحتاج رقمًا سريًا من ٤ أرقام`,`${bad.name||'This child'} needs a 4-digit PIN`][LI]); return }
@@ -712,6 +735,8 @@ function wFinish(){
   freshData();
   S.country=w.country; S.lang=w.lang; LI=w.lang; S.familyName=w.family.trim();
   S.parentPin=w.pin; S.period=w.period; S.bonusPct=w.bonus;
+  myName=(w.pName||'').trim();
+  S.parents=[{name:myName,email:(w.pEmail||'').trim(),role:w.pRole}];
   S.features.religious=w.religious;
   const qn=(w.questName||'').trim();
   S.features.quest = !!(w.questOn&&qn);
@@ -792,6 +817,16 @@ function wizardHTML(){
       <label class="lbl" style="margin-top:12px">${t('appLang')}</label>
       <div class="seg" style="width:100%">${LANGS.map((l,i)=>`<button class="${w.lang===i?'on':''}" style="flex:1" onclick="setLangW(${i});render()">${l[LI]||l[1]}</button>`).join('')}</div>
       <p class="t-sub" style="margin:6px 2px 0">${t('langNote')}</p>
+      <div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:14px">
+        <p class="t-name" style="font-size:15px;margin-bottom:8px">👤 ${t('yourData')}</p>
+        <label class="lbl">${t('yourName')}</label>
+        <input class="inp" value="${w.pName||''}" placeholder="${t('yourNamePh')}" oninput="wPName(this.value)">
+        <label class="lbl" style="margin-top:10px">${t('yourEmail')}</label>
+        <input class="inp" type="email" inputmode="email" value="${w.pEmail||''}" placeholder="name@example.com" oninput="wPEmail(this.value)">
+        <p class="t-sub" style="margin:5px 2px 0">${t('emailNote')}</p>
+        <label class="lbl" style="margin-top:11px">${t('youAre')}</label>
+        ${roleRow(w.pRole,'wPRole')}
+      </div>
       <label class="lbl" style="margin-top:14px">${t('famName')}</label>
       <input class="inp" value="${w.family}" placeholder="${t('famPh')}" oninput="wFam(this.value)">
       ${famToken?`<div class="card" style="margin-top:16px;border-color:var(--gold-deep);background:var(--chip)">
@@ -966,7 +1001,7 @@ function pickParent(){
   if(S.parentPin&&!unlocked){ S.mode='pin'; S.pinFor='parent'; S.pinErr=false; render(); return }
   enterParent();
 }
-function enterParent(){ S.role='parent'; S.mode= myName?'app':'whoami'; S.parentTab='family'; save(); render() }
+function enterParent(){ S.role='parent'; S.mode='app'; S.parentTab='family'; save(); render() }
 function setMyName(n){ myName=n; save(); S.mode='app'; render() }
 function tryPin(v){
   const f=S.pinFor;
@@ -1014,14 +1049,35 @@ function pinHTML(){
     <button class="btn btn-ghost" style="flex:0 0 auto;padding:12px 17px" onclick="goSwitch()">→</button>
     <button class="btn btn-teal" style="flex:1" onclick="tryPin(document.getElementById('pinInp').value)">${t('enter')} 🔓</button></div></div>`;
 }
-function whoamiHTML(){
+function roleRow(cur,fn){
   const opts=[['dad','👨'],['mom','👩'],['guardian','🧑']];
-  return `<div class="wiz"><div class="wiz-body" style="text-align:center;padding-top:44px">
-    <div style="font-size:50px">👋</div><h2>${['أنت مين؟','من أنت؟','Who are you?'][LI]}</h2>
-    <p class="lead">${['عشان نعرف مين اعتمد إيه في سجل العيلة','لنعرف من اعتمد ماذا في سجل العائلة','So the family log shows who approved what'][LI]}</p>
-    <div class="row" style="gap:9px;justify-content:center;flex-wrap:wrap">
-    ${opts.map(o=>`<button class="btn btn-teal" style="padding:13px 18px;font-size:15px" onclick="setMyName('${t(o[0])}')">${o[1]} ${t(o[0])}</button>`).join('')}
-    </div></div></div>`;
+  return `<div class="row" style="gap:7px;flex-wrap:wrap">${opts.map(o=>
+    `<button class="btn ${cur===t(o[0])?'btn-teal':'btn-ghost'} grow" style="font-size:14px" onclick="${fn}('${t(o[0])}')">${o[1]} ${t(o[0])}</button>`).join('')}</div>`;
+}
+/* a second parent joining by link identifies themselves once, right here */
+function jSet(k,v){ S[k]=v } function jRole(r){ S.jr=r; render() }
+function joinMeSave(){
+  const n=(S.jn||'').trim(), e=(S.je||'').trim();
+  if(!n){ toast(t('needName')); return }
+  if(!validEmail(e)){ toast(t('needEmail')); return }
+  if(!S.jr){ toast(t('needRole')); return }
+  myName=n; S.parents=(S.parents||[]).filter(p=>p.name!==n);
+  S.parents.push({name:n,email:e,role:S.jr});
+  logIt(['انضم للعيلة','انضم إلى العائلة','joined the family'][LI]);
+  S.mode='switch'; S.role='child'; save(); render();
+}
+function joinMeHTML(){
+  return `<div class="wiz"><div class="wiz-body" style="padding-top:26px">
+    <div style="text-align:center"><div style="font-size:48px">👋</div>
+    <h2>${t('joinedTitle')}</h2><p class="lead">${t('joinedSub')}</p></div>
+    <label class="lbl">${t('yourName')}</label>
+    <input class="inp" value="${S.jn||''}" placeholder="${t('yourNamePh')}" oninput="jSet('jn',this.value)">
+    <label class="lbl" style="margin-top:11px">${t('yourEmail')}</label>
+    <input class="inp" type="email" inputmode="email" value="${S.je||''}" placeholder="name@example.com" oninput="jSet('je',this.value)">
+    <label class="lbl" style="margin-top:11px">${t('youAre')}</label>
+    ${roleRow(S.jr,'jRole')}
+    </div><div class="wiz-foot">
+    <button class="btn btn-teal" style="flex:1" onclick="joinMeSave()">${t('startNow')} ←</button></div></div>`;
 }
 /* ================= actions ================= */
 const RJ=[['ما اتعملتش كاملة','لم تُنفذ بالكامل','Not fully done'],
@@ -1994,7 +2050,7 @@ function render(){
   if(S.mode==='wizard') h=wizardHTML();
   else if(S.mode==='switch') h=switcherHTML();
   else if(S.mode==='pin') h=pinHTML();
-  else if(S.mode==='whoami') h=whoamiHTML();
+  else if(S.mode==='joinme') h=joinMeHTML();
   else if(S.mode==='share') h=shareHTML();
   else if(S.mode==='recover') h=`<div class="wiz"><div class="wiz-body" style="text-align:center;padding-top:70px">
       <div style="font-size:48px">🔄</div><h2>${['بنرجّع عيلتك…','جارٍ استرجاع عائلتك…','Restoring your family…'][LI]}</h2>
@@ -2051,7 +2107,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){ try{ navigator
   if(famQ&&!famToken){
     famToken=famQ; rev=0; save(); render();
     cloudPull(true).then(ok=>{
-      if(ok&&S.kids.length){ S.mode='switch'; startPoll() }
+      if(ok&&S.kids.length){ S.mode= myName?'switch':'joinme'; startPoll() }
       else if(!ok){ famToken=null; save(); toast(['مفيش نت — افتح الرابط تاني','تعذّر الاتصال — افتح الرابط مجددًا','No connection — open the link again'][LI]) }
       render();
     });
